@@ -10,10 +10,18 @@ export type MatchResult = {
   overlappingTags: string[];
 };
 
+function toArr(v: unknown): string[] {
+  if (Array.isArray(v)) return v as string[];
+  if (v && typeof v === "object") return Object.values(v as Record<string, string>);
+  return [];
+}
+
 function tagOverlap(a: Player, b: Player): string[] {
-  return a.consented_tags.filter(
-    (t) => b.consented_tags.includes(t) && !a.hard_limits.includes(t) && !b.hard_limits.includes(t)
-  );
+  const aTags = toArr(a.consented_tags);
+  const bTags = toArr(b.consented_tags);
+  const aLimits = toArr(a.hard_limits);
+  const bLimits = toArr(b.hard_limits);
+  return aTags.filter((t) => bTags.includes(t) && !aLimits.includes(t) && !bLimits.includes(t));
 }
 
 export function findBestMatch(
@@ -43,7 +51,7 @@ export function findBestMatch(
   }
 
   const [playerA, playerB] = bestPair;
-  const allAvailableTags = [...new Set([...playerA.consented_tags, ...playerB.consented_tags])];
+  const allAvailableTags = [...new Set([...toArr(playerA.consented_tags), ...toArr(playerB.consented_tags)])];
 
   const command = getRandomCommand(
     sexinessLevel,

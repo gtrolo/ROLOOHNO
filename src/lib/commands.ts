@@ -281,22 +281,23 @@ export function getCommandById(id: string): Command | undefined {
 
 export function getRandomCommand(
   level: number,
-  usedIds: string[],
-  availableTags: string[],
+  usedIds: string[] | null | undefined,
+  availableTags: string[] | null | undefined,
   targetCount: number = 2
 ): Command | null {
+  const safeUsed = Array.isArray(usedIds) ? usedIds : [];
+  const safeTags = Array.isArray(availableTags) ? availableTags : [];
   const candidates = COMMANDS.filter(
     (c) =>
       c.level <= level &&
       c.level >= Math.max(1, level - 1) &&
-      !usedIds.includes(c.id) &&
+      !safeUsed.includes(c.id) &&
       c.target_count <= targetCount &&
-      (c.tags.length === 0 || c.tags.some((t) => availableTags.includes(t)))
+      (c.tags.length === 0 || c.tags.some((t) => safeTags.includes(t)))
   );
   if (!candidates.length) {
-    // fallback: any unused command at this level
     const fallback = COMMANDS.filter(
-      (c) => c.level <= level && !usedIds.includes(c.id)
+      (c) => c.level <= level && !safeUsed.includes(c.id)
     );
     if (!fallback.length) return null;
     return fallback[Math.floor(Math.random() * fallback.length)];

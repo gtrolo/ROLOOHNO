@@ -84,7 +84,11 @@ export default function GamePage() {
 
   const handleGenerate = useCallback(async () => {
     if (!room || !isHost) return;
-    const gs = { ...DEFAULT_GAME_STATE, ...room.game_state };
+    const gsRaw = { ...DEFAULT_GAME_STATE, ...room.game_state };
+    const gs = {
+      ...gsRaw,
+      completed_command_ids: Array.isArray(gsRaw.completed_command_ids) ? gsRaw.completed_command_ids : [],
+    };
     const ready = players.filter((p) => p.setup_complete);
 
     let commandText: string | null = null;
@@ -129,7 +133,8 @@ export default function GamePage() {
 
   useEffect(() => {
     if (!isHost || !room) return;
-    const gs = { ...DEFAULT_GAME_STATE, ...room.game_state };
+    const gsRaw2 = { ...DEFAULT_GAME_STATE, ...room.game_state };
+    const gs = { ...gsRaw2, completed_command_ids: Array.isArray(gsRaw2.completed_command_ids) ? gsRaw2.completed_command_ids : [] };
     if (gs.subphase !== "executing" || !gs.consent_gate || gs.active_command) return;
     const gate = gs.consent_gate;
     if (!Object.values(gate.consented).every((v) => v === true)) return;
@@ -150,7 +155,8 @@ export default function GamePage() {
   }, [room?.game_state?.subphase, room?.game_state?.consent_gate]);
 
   const me = players.find((p) => p.id === playerId);
-  const gs = room ? { ...DEFAULT_GAME_STATE, ...room.game_state } : DEFAULT_GAME_STATE;
+  const gsRaw3 = room ? { ...DEFAULT_GAME_STATE, ...room.game_state } : DEFAULT_GAME_STATE;
+  const gs = { ...gsRaw3, completed_command_ids: Array.isArray(gsRaw3.completed_command_ids) ? gsRaw3.completed_command_ids : [] };
 
   if (!room) {
     return (

@@ -122,17 +122,23 @@ export async function startCommand(
   });
 }
 
+function toArr<T>(v: T[] | null | undefined | Record<string, T>): T[] {
+  if (Array.isArray(v)) return v;
+  if (v && typeof v === "object") return Object.values(v) as T[];
+  return [];
+}
+
 export async function completeCommand(code: string, playerId: string): Promise<void> {
   const room = await getRoomByCode(code);
   if (!room) return;
   const gs: GameState = { ...DEFAULT_GAME_STATE, ...room.game_state };
   if (!gs.active_command) return;
 
-  const completedBy = [...(gs.active_command.completed_by ?? []), playerId];
-  const allDone = gs.active_command.target_player_ids.every((id) => completedBy.includes(id));
+  const completedBy = [...toArr(gs.active_command.completed_by), playerId];
+  const allDone = toArr(gs.active_command.target_player_ids).every((id) => completedBy.includes(id));
 
   if (allDone) {
-    const completedIds = [...gs.completed_command_ids, gs.active_command.id];
+    const completedIds = [...toArr(gs.completed_command_ids), gs.active_command.id];
     await patchGameState(code, {
       subphase: "rating",
       active_command: { ...gs.active_command, completed_by: completedBy },
