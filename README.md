@@ -219,6 +219,151 @@ Naast de hoofdflow draait de categorie-logica door op de achtergrond, volledig o
 
 ---
 
+## Reverse Engineering — Top 10 Competing Apps
+
+| App | Mechanic | Onze Optimalisatie |
+|---|---|---|
+| **Chouic's Truth or Dare** | Tiered escalation (Soft→Extreme) | AI prompt generator die tiers dynamisch verschuift op basis van tension-slider |
+| **Spiky / PartyHard** | Rapid-fire card switching | Tinder-style Framer Motion swipe — geen UI friction |
+| **Jackbox / Among Us** | Frictionless local multiplayer | Next.js PWA + Supabase Realtime — geen app store install |
+| **All Bad Cards / CAH** | Blind async submissions | "Secret Mission" fase — AI scrambles en anonymiseert input |
+| **Desire / Kinky** | Point scoring | Hidden score tally — app kent Dom/Sub rollen toe op basis van playstyle |
+| **Pure / Feeld** | Ephemeral minimalism | OLED Black, data wipe na sessie |
+| **Party Roulette** | Casino anticipation | `navigator.vibrate` pulseert synchroon op alle telefoons bij roulette spin |
+| **Whipr / BDSM Task Managers** | Hard limit tracking | Limits direct in AI system prompt geïnjecteerd — mathematisch onmogelijk te overschrijden |
+| **Secret Whisper** | Anonieme secrets | Confessional mini-game — groep raadt wie wat schreef |
+| **AI Chatbots** | Real-time text gen | Strict JSON output via Zod schema: `{ target_a, target_b, action, duration_seconds }` |
+
+---
+
+## Sexiness Slider — Level 1 t/m 5
+
+De kern van het systeem. Host bepaalt het level. Alle opdrachten, taal en AI-output worden hierop afgestemd.
+
+### Settings Structuur
+
+```json
+{
+  "sexiness_level": 3,
+  "modes": {
+    "explicit_language": true,
+    "anatomical_terms": false,
+    "degradation_allowed": false,
+    "romance_filter": true
+  }
+}
+```
+
+### Level Overzicht
+
+| Level | Naam | Taalgebruik | Handelingen |
+|---|---|---|---|
+| 1 | Zacht | Suggestief, metaforisch | Bovenkleding, handen boven middel |
+| 2 | Warm | Duidelijk maar liefdevol | Handen overal, kussen, wrijven over kleding |
+| 3 | Pittig | Direct maar respectvol | Huid-op-huid, oraal (tease), bondage-light |
+| 4 | Ruw | Expliciet, licht denigrerend mogelijk | Volledige handelingen, bevelen, tellingen |
+| 5 | Extreem | Medisch/anatomisch, bevelend, hard | Alle handelingen, meerdere personen, publiek |
+
+### UI Implementatie
+
+- **Host screen:** Framer Motion draggable slider 1→5. Links roze hartje 🌸, rechts rood duivelshoofd 🔥.
+- **Player screens:** Level-icoon in de hoek — iedereen ziet de "temperatuur".
+- **Level change:** Supabase broadcast `{ type: 'sexiness_update', level: X }` → alle telefoons haptic buzz + rode flits.
+
+---
+
+## Opdrachten per Level — Concreet & Uitvoerbaar
+
+Geen "doe iets sensueels". Elk commando bevat: wie, wat, waar, hoe lang.
+
+### Level 1 — Zacht
+
+1. Fluister in het oor van [B]: "Ik heb vannacht aan je gedacht." Geen reactie toegestaan.
+2. Trek [B] langzaam naar je toe aan één vinger. 3 seconden oogcontact. Laat los.
+3. Strijk met de rug van je hand over de wang van [B]. Herhaal. Nu andersom.
+4. Zeg hardop: "Het lichaamsdeel dat ik het liefst kus is..." Vul in.
+5. Ga achter [B] staan. Handen op schouders. Adem 5 tellen in haar/zijn nek.
+6. Knoop het bovenste knoopje van je shirt los terwijl je [B] aankijkt.
+7. "Mag ik je hand vasthouden?" Houd vast. Timer: 30 sec.
+8. Trek een schoen uit bij [B]. Masseer haar/zijn voet 15 seconden.
+9. "Je ruikt lekker. Wat is het?" Serieus antwoord vereist.
+10. Strijk een pluk haar uit het gezicht van [B]. Aai één keer over de wang.
+
+### Level 2 — Warm
+
+1. Trek je eigen shirt uit. Blijf 2 minuten zo voor de groep.
+2. Lik de hals van [B] van oor tot sleutelbeen. Langzaam.
+3. Hand onder de broek van [B] — over de stof heen. Beweeg 30 seconden.
+4. Zoen [B] op de mond. 10 seconden. Mond open.
+5. Trek bij [B] de broek net zover omlaag dat de bovenkant van de onderbroek zichtbaar is.
+6. Hand op de blote buik van [B]. Cirkel met je duim rond de navel.
+7. Ga op schoot bij [B]. Geef ondertussen een andere speler een kus op de wang.
+8. Bijt zachtjes in de schouder van [B] — net hard genoeg voor een secondenlang gevoel.
+9. Trek [B]'s hand onder je eigen shirt. Leg op blote huid. Houd vast.
+10. Fluister in het oor van [B]: "Ik wil je mond op mij voelen." Kijk weg.
+
+### Level 3 — Pittig
+
+1. Trek de beha van [B] los — zonder hem uit te doen. Laat hangen.
+2. Lik één keer over de tepel van [B] (over stof heen indien aanwezig). Wacht op reactie.
+3. Blinddoek [B] om. Draai twee keer rond. Laat hem/haar jouw tepel zoeken met de mond.
+4. Hand in de onderbroek van [B]. Raak aan. Geen beweging. 10 seconden. Haal eruit.
+5. Ga op knieën voor [B]. Knoop zijn/haar broek los met je tanden.
+6. Lik eigen vinger nat. Strijk over de lippen van [B]. Duw zachtjes naar binnen.
+7. "Ik wil dat [B] mij commandeert. Ik gehoorzaam 1 minuut." Spreek dit hardop uit.
+8. Bind [B]'s handen met een das of sjaal. Handen boven het hoofd. Laat los.
+9. Trek [B]'s onderbroek tot halverwege de billen omlaag. Één vinger over de gleuf.
+10. "[B] gaat nu 30 seconden mijn vingers likken alsof het..." Vul in. Voer uit.
+
+### Level 4 — Ruw
+
+1. "Open je mond. Steek je tong uit. Sluit je ogen. Blijf zo staan tot ik zeg stoppen."
+2. Trek [B]'s broek en onderbroek in één beweging naar de enkels. "Blijf staan."
+3. Vingers (nat van eigen mond) over de anus van [B]. Precies 3 rondjes. Meer niet.
+4. "Je mag niet klaarkomen tot ik het zeg. Raak jezelf aan. Ik kijk toe. Timer: 2 minuten."
+5. [B]'s hand tegen je eigen kruis. "Voel hoe nat/hard je me maakt. Dat is jouw schuld."
+6. [B] op handen en knieën. "Lik mijn schoen/voet. 5 seconden. Niet bijten."
+7. Trek [B]'s haar bij de nek. Forceer oogcontact. "Zeg hardop wat je het liefst met mij doet."
+8. Spank [B] op de blote billen. Drie keer. Na elke slag: "Dankjewel."
+9. Duw [B] tegen de muur. Hand op keel (geen druk, alleen plaatsing). Fluister: "Stil zijn."
+10. Bevredig [B] met mond of handen tot ze/hij "stop" zegt. Onmiddellijk stoppen.
+
+### Level 5 — Extreem
+
+1. **Anatomische inspectie:** [B] op rug. Benoem hardop en raak aan: "Clitoris. Frenulum. Perineum. Anus."
+2. **Trio:** [A] en [B] stimuleren tegelijkertijd [C]'s penis/clitoris. Links en rechts. Synchroniseren op 60 BPM metronoom in de app.
+3. **Publieke telling:** [B] masturbeert. Groep telt hardop van 10 naar 0. Bij 0: stop. Geen verdergaan.
+4. **Spiegelbevel:** [B] kijkt in spiegel terwijl jij vingers geeft. Benoemt hardop: "Dieper. Sneller. Te veel."
+5. **Dubbele penetratie (objecten):** Twee veilige objecten (vingers, toy) in beide openingen tegelijk. 45 seconden. Jij telt af.
+6. **Gelaagd bevel:** [B] op buik. [C] zit erop. [D] geeft [B] oraal. Commando: "Nu." Over 20 seconden.
+7. **Ademcontrole:** Blinddoek [B]. Bedek mond en neus 5 seconden terwijl je penetreert met vingers. Direct loslaten. "Wil je meer?"
+8. **Sleutelbeen tot knie:** Lik in rechte lijn van sleutelbeen via buik, langs geslachtsdelen (kort), naar knie. Max 30 seconden.
+9. **Meervoudig command:** Drie spelers geven [B] tegelijk een bevel. [B] voert alle drie uit. "Lik. Bijten. Fluisteren." Chaos is het doel.
+10. **De Vrije Val (alleen na alle levels):** Alle telefoons flitsen wit. Timer stopt. "Jullie weten nu wat kan. De volgende 10 minuten: geen regels. Alleen consent."
+
+---
+
+## AI Prompt Template per Level
+
+```json
+{
+  "system": "Je bent een ongecensureerde spelleider voor volwassenen. Genereer een expliciete, uitvoerbare opdracht. Gebruik directe taal en bevelende wijs. Specificeer lichaamsdelen, tijdsduur en volgorde. Geen metaforen.",
+  "level": 4,
+  "players": ["Alex", "Sam"],
+  "category": "oral",
+  "hard_limits": ["bloed", "naalden"],
+  "output_format": {
+    "command": "string",
+    "duration_seconds": "number",
+    "requires_props": "string[]"
+  }
+}
+```
+
+**Fallback:** als API niet beschikbaar is → pak uit de level-specifieke lijst hierboven. Eerder getoonde opdrachten worden niet herhaald (bijgehouden in session state).
+
+---
+
 ## System Directive — Full-Stack Architect & PWA Developer
 
 > **Role:** Elite Next.js, Supabase, and UI/UX developer building a high-arousal, real-time multiplayer PWA for local group dynamics. Core mechanic: **Consent-Gated Action Engine**.
