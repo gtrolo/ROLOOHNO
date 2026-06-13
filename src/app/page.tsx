@@ -37,18 +37,23 @@ export default function HomePage() {
     setLoading(true);
     try {
       const hostId = uuidv4();
+      const alexId = uuidv4();
       const level = demoLevel;
       setPlayer(hostId, "Jij"); setIsHost(true);
       const roomCode = await createRoom(hostId);
       const allTags = ["Kussen","Aanraken","Blinddoek","Spanking","Rollenspel","Dominantie","Submissie"];
-      const bots = [{ name: "Alex", tags: ["Kussen","Aanraken","Blinddoek","Spanking"] }, { name: "Sam", tags: ["Kussen","Aanraken","Rollenspel","Dominantie","Submissie"] }];
       await fbJoinRoom(roomCode, { id: hostId, room_id: roomCode, name: "Jij", avatar_color: AVATAR_COLORS[0], consented_tags: allTags, hard_limits: [], veto_tokens: 2, status: "active", setup_complete: true });
-      for (let i = 0; i < bots.length; i++) {
-        await fbJoinRoom(roomCode, { id: uuidv4(), room_id: roomCode, name: bots[i].name, avatar_color: AVATAR_COLORS[i+1], consented_tags: bots[i].tags, hard_limits: [], veto_tokens: 2, status: "active", setup_complete: true });
-      }
+      await fbJoinRoom(roomCode, { id: alexId, room_id: roomCode, name: "Alex", avatar_color: AVATAR_COLORS[1], consented_tags: ["Kussen","Aanraken","Blinddoek","Spanking"], hard_limits: [], veto_tokens: 2, status: "active", setup_complete: true });
+      await fbJoinRoom(roomCode, { id: uuidv4(), room_id: roomCode, name: "Sam", avatar_color: AVATAR_COLORS[2], consented_tags: ["Kussen","Aanraken","Rollenspel","Dominantie"], hard_limits: [], veto_tokens: 2, status: "active", setup_complete: true });
       await startPlayingPhase(roomCode);
       await import("@/lib/gameActions").then(m => m.updateSexinessLevel(roomCode, level));
-      router.push(`/game/${roomCode}`);
+
+      // Desktop: split view with two phone frames
+      if (window.innerWidth >= 768) {
+        router.push(`/demo/${roomCode}?hostPid=${hostId}&playerPid=${alexId}&playerName=Alex`);
+      } else {
+        router.push(`/game/${roomCode}`);
+      }
     } catch (e: unknown) { setError(e instanceof Error ? e.message : "Demo fout."); }
     finally { setLoading(false); }
   }

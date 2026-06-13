@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { PauseOverlay } from "@/components/PauseOverlay";
+import { PhoneShell } from "@/components/PhoneShell";
 
 export const metadata: Metadata = {
   title: "ROLOOHNO",
@@ -32,9 +33,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           rel="stylesheet"
         />
       </head>
-      <body className="min-h-screen bg-black text-white antialiased select-none" style={{ fontFamily: "'Inter', system-ui, sans-serif" }}>
-        <PauseOverlay />
-        {children}
+      <body className="text-white antialiased select-none" style={{ fontFamily: "'Inter', system-ui, sans-serif", backgroundColor: "#080808" }}>
+        <PhoneShell>
+          <PauseOverlay />
+          {children}
+        </PhoneShell>
       </body>
     </html>
   );

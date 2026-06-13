@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useCallback, useRef } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { db, ref, onValue, off, Player, Room, DEFAULT_GAME_STATE, LEVEL_NAMES } from "@/lib/firebase";
 import { useGameStore } from "@/store/gameStore";
@@ -20,11 +20,27 @@ import { findBestMatch } from "@/lib/matchmaker";
 
 export default function GamePage() {
   const { code } = useParams<{ code: string }>();
+  const searchParams = useSearchParams();
   const {
-    playerId, room, players, isHost,
-    setRoom, setPlayers, setPaused, activeSecretMission,
-    setActiveSecretMission, triggerFlash, showFlash,
+    playerId: storedPlayerId, room, players, isHost: storedIsHost,
+    setRoom, setPlayers, setPaused, setPlayer, setIsHost,
+    activeSecretMission, setActiveSecretMission, triggerFlash, showFlash,
   } = useGameStore();
+
+  // Allow iframes to init identity from URL params (demo split view)
+  const urlPid = searchParams.get("pid");
+  const urlHost = searchParams.get("host") === "1";
+  const urlName = searchParams.get("name") ?? "Speler";
+  useEffect(() => {
+    if (urlPid && !storedPlayerId) {
+      setPlayer(urlPid, urlName);
+      setIsHost(urlHost);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlPid]);
+
+  const playerId = storedPlayerId ?? urlPid ?? null;
+  const isHost = storedPlayerId ? storedIsHost : urlHost;
 
   const roomRef = useRef<Room | null>(null);
   roomRef.current = room;
