@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { supabase, Player, DEFAULT_GAME_STATE, LEVEL_NAMES } from "@/lib/supabase";
+import { db, ref, onValue, off, Player, DEFAULT_GAME_STATE, LEVEL_NAMES, Room } from "@/lib/firebase";
 import { useGameStore } from "@/store/gameStore";
 import { PanicButton } from "@/components/PanicButton";
 import { PlayerChip } from "@/components/PlayerChip";
@@ -14,74 +14,50 @@ export default function LobbyPage() {
   const { code } = useParams<{ code: string }>();
   const router = useRouter();
   const { playerId, isHost, room, players, setRoom, setPlayers, setPaused } = useGameStore();
-  const [roomId, setRoomId] = useState<string | null>(null);
   const [localLevel, setLocalLevel] = useState(2);
 
   const gs = room ? { ...DEFAULT_GAME_STATE, ...room.game_state } : DEFAULT_GAME_STATE;
 
-  // Sync local level with room state
   useEffect(() => {
     if (room?.game_state?.sexiness_level) {
       setLocalLevel(room.game_state.sexiness_level);
     }
   }, [room?.game_state?.sexiness_level]);
 
-  // Bootstrap
+  // Subscribe to room and players via Firebase
   useEffect(() => {
     if (!code) return;
+    const upperCode = code.toUpperCase();
 
-    async function bootstrap() {
-      const { data: r } = await supabase
-        .from("rooms")
-        .select("*")
-        .eq("room_code", code.toUpperCase())
-        .single();
-      if (!r) return;
-      setRoom(r);
-      setRoomId(r.id);
-      const { data: ps } = await supabase
-        .from("players")
-        .select("*")
-        .eq("room_id", r.id);
-      setPlayers(ps ?? []);
-    }
+    const roomRef = ref(db, `rooms/${upperCode}`);
+    const unsubRoom = onValue(roomRef, (snap) => {
+      if (!snap.exists()) return;
+      const data = snap.val() as Room;
+      setRoom(data);
+      setPaused(!!data.paused);
+      if (data.game_state?.phase === "setup") {
+        router.push(`/setup/${upperCode}`);
+      }
+    });
 
-    bootstrap();
-  }, [code, setRoom, setPlayers]);
+    const playersRef = ref(db, `rooms/${upperCode}/players`);
+    const unsubPlayers = onValue(playersRef, (snap) => {
+      if (!snap.exists()) {
+        setPlayers([]);
+        return;
+      }
+      setPlayers(Object.values(snap.val() as Record<string, Player>));
+    });
 
-  // Realtime
-  useEffect(() => {
-    if (!roomId) return;
-
-    const ch = supabase
-      .channel(`lobby:${code}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "players", filter: `room_id=eq.${roomId}` },
-        async () => {
-          const { data } = await supabase.from("players").select("*").eq("room_id", roomId);
-          setPlayers(data ?? []);
-        }
-      )
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "rooms" },
-        (payload) => {
-          setRoom(payload.new as import("@/lib/supabase").Room);
-          const newGs = payload.new?.game_state;
-          if (newGs?.phase === "setup") {
-            router.push(`/setup/${code}`);
-          }
-        }
-      )
-      .on("broadcast", { event: "PANIC" }, ({ payload }) => {
-        setPaused(payload.paused);
-      })
-      .subscribe();
-
-    return () => { supabase.removeChannel(ch); };
-  }, [roomId, code, setPlayers, setRoom, setPaused, router]);
+    return () => {
+      off(roomRef);
+      off(playersRef);
+    };
+  }, [code, setRoom, setPlayers, setPaused, router]);
 
   async function handleLevelChange(level: number) {
     setLocalLevel(level);
     await updateSexinessLevel(code, level);
-    // Haptic + flash for all clients via the rooms table update
     if (navigator.vibrate) navigator.vibrate(level >= 4 ? [60, 20, 60] : [30]);
   }
 
@@ -97,7 +73,6 @@ export default function LobbyPage() {
     <main className="min-h-screen bg-black flex flex-col px-6 py-10">
       <PanicButton />
 
-      {/* Room code */}
       <div className="text-center mb-10">
         <p className="text-xs tracking-[0.3em] uppercase mb-3" style={{ color: "rgba(255,255,255,0.3)" }}>
           ROOM CODE
@@ -123,7 +98,6 @@ export default function LobbyPage() {
         )}
       </div>
 
-      {/* Players */}
       <div className="flex-1">
         <p className="text-xs tracking-widest uppercase mb-4" style={{ color: "rgba(255,255,255,0.3)" }}>
           SPELERS ({players.length})
@@ -148,7 +122,6 @@ export default function LobbyPage() {
         </div>
       </div>
 
-      {/* Host controls */}
       {isHost && (
         <div className="flex flex-col gap-6 mt-8">
           <div
@@ -180,7 +153,6 @@ export default function LobbyPage() {
         </div>
       )}
 
-      {/* Player waiting */}
       {!isHost && (
         <div className="mt-8 text-center">
           <p className="text-xs tracking-widest uppercase animate-pulse" style={{ color: "rgba(255,255,255,0.25)" }}>

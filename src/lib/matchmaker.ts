@@ -1,4 +1,4 @@
-import { Player } from "./supabase";
+import { Player } from "./firebase";
 import { getRandomCommand, Command } from "./commands";
 
 export type MatchResult = {

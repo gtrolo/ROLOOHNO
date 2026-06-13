@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { ActiveCommand } from "@/lib/supabase";
+import { ActiveCommand } from "@/lib/firebase";
 import { TimerRing } from "./TimerRing";
 
 type Props = {

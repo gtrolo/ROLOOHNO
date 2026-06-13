@@ -1,6 +1,6 @@
 "use client";
 
-import { ALL_TAGS, Tag } from "@/lib/supabase";
+import { ALL_TAGS, Tag } from "@/lib/firebase";
 
 type Props = {
   selected: string[];

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion, useAnimation, PanInfo } from "framer-motion";
-import { LEVEL_NAMES } from "@/lib/supabase";
+import { LEVEL_NAMES } from "@/lib/firebase";
 
 type Props = {
   category: string;

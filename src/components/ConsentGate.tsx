@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { ConsentGateState, LEVEL_NAMES } from "@/lib/supabase";
+import { ConsentGateState, LEVEL_NAMES } from "@/lib/firebase";
 import { SwipeCard } from "./SwipeCard";
 
 type HostViewProps = {

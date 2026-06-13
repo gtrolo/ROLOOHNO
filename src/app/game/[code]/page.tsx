@@ -3,7 +3,7 @@
 import { useEffect, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { supabase, Player, Room, DEFAULT_GAME_STATE, LEVEL_NAMES } from "@/lib/supabase";
+import { db, ref, onValue, off, Player, Room, DEFAULT_GAME_STATE, LEVEL_NAMES } from "@/lib/firebase";
 import { useGameStore } from "@/store/gameStore";
 import { PanicButton } from "@/components/PanicButton";
 import { PauseOverlay } from "@/components/PauseOverlay";
@@ -19,6 +19,7 @@ import {
   completeCommand,
   finishRating,
   pauseGame,
+  clearSecretMission,
 } from "@/lib/gameActions";
 import { findBestMatch } from "@/lib/matchmaker";
 
@@ -27,7 +28,7 @@ export default function GamePage() {
   const {
     playerId, room, players, isHost,
     setRoom, setPlayers, setPaused, activeSecretMission,
-    setActiveSecretMission, triggerFlash,
+    setActiveSecretMission, triggerFlash, showFlash,
   } = useGameStore();
 
   const roomRef = useRef<Room | null>(null);
@@ -35,97 +36,126 @@ export default function GamePage() {
   const playersRef = useRef<Player[]>([]);
   playersRef.current = players;
 
-  // ─── Supabase subscription ─────────────────────────────────────────────────
+  // ─── Firebase subscriptions ────────────────────────────────────────────────
   useEffect(() => {
     if (!code) return;
-    let roomId: string;
+    const upperCode = code.toUpperCase();
 
-    async function bootstrap() {
-      const { data: r } = await supabase
-        .from("rooms")
-        .select("*")
-        .eq("room_code", code.toUpperCase())
-        .single();
-      if (!r) return;
-      setRoom(r);
-      roomId = r.id;
+    const rRef = ref(db, `rooms/${upperCode}`);
+    onValue(rRef, (snap) => {
+      if (!snap.exists()) return;
+      const data = snap.val() as Room;
+      setRoom(data);
+      setPaused(!!data.paused);
+      const gs = data.game_state;
+      if (gs.subphase === "consent_gate") triggerFlash("#FF2400");
+      if (gs.subphase === "executing") triggerFlash("#FF007F");
+      if (navigator.vibrate) {
+        if (gs.subphase === "consent_gate") navigator.vibrate([100, 50, 100]);
+        if (gs.subphase === "executing") navigator.vibrate([200]);
+      }
+    });
 
-      const { data: ps } = await supabase
-        .from("players")
-        .select("*")
-        .eq("room_id", r.id);
-      setPlayers(ps ?? []);
+    const pRef = ref(db, `rooms/${upperCode}/players`);
+    onValue(pRef, (snap) => {
+      if (!snap.exists()) { setPlayers([]); return; }
+      setPlayers(Object.values(snap.val() as Record<string, Player>));
+    });
+
+    // Secret missions for this player
+    if (playerId) {
+      const smRef = ref(db, `rooms/${upperCode}/secret_missions/${playerId}`);
+      onValue(smRef, (snap) => {
+        if (!snap.exists()) { setActiveSecretMission(null); return; }
+        setActiveSecretMission(snap.val());
+        if (navigator.vibrate) navigator.vibrate([50, 50, 50, 50, 50]);
+      });
     }
 
-    bootstrap();
-
-    const ch = supabase
-      .channel(`game:${code}`)
-      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "rooms" },
-        (payload) => {
-          const updated = payload.new as Room;
-          setRoom(updated);
-          const gs = updated.game_state;
-          // Flash on phase transitions
-          if (gs.subphase === "consent_gate") triggerFlash("#FF2400");
-          if (gs.subphase === "executing") triggerFlash("#FF007F");
-          // Haptics
-          if (navigator.vibrate) {
-            if (gs.subphase === "consent_gate") navigator.vibrate([100, 50, 100]);
-            if (gs.subphase === "executing") navigator.vibrate([200]);
-          }
-        }
-      )
-      .on("postgres_changes", { event: "*", schema: "public", table: "players" },
-        async () => {
-          if (!roomId) return;
-          const { data } = await supabase.from("players").select("*").eq("room_id", roomId);
-          setPlayers(data ?? []);
-        }
-      )
-      .on("broadcast", { event: "PANIC" }, ({ payload }) => {
-        setPaused(payload.paused);
-        if (payload.paused && navigator.vibrate) navigator.vibrate([200, 100, 200]);
-      })
-      .on("broadcast", { event: "SECRET_MISSION" }, ({ payload }) => {
-        if (payload.target_player_id === playerId) {
-          setActiveSecretMission(payload);
-          if (navigator.vibrate) navigator.vibrate([50, 50, 50, 50, 50]);
-        }
-      })
-      .subscribe();
-
-    return () => { supabase.removeChannel(ch); };
+    return () => {
+      off(ref(db, `rooms/${upperCode}`));
+      off(ref(db, `rooms/${upperCode}/players`));
+      if (playerId) off(ref(db, `rooms/${upperCode}/secret_missions/${playerId}`));
+    };
   }, [code, playerId, setRoom, setPlayers, setPaused, setActiveSecretMission, triggerFlash]);
 
   // ─── Host: generate next dare ──────────────────────────────────────────────
   const handleGenerate = useCallback(async () => {
     if (!room || !isHost) return;
     const gs = { ...DEFAULT_GAME_STATE, ...room.game_state };
-    const match = findBestMatch(
-      players.filter((p) => p.setup_complete),
-      gs.sexiness_level,
-      gs.completed_command_ids
-    );
+    const readyPlayers = players.filter((p) => p.setup_complete);
+
+    // Try AI if available, fall back to local commands
+    let commandText: string | null = null;
+    let commandCategory = "Algemeen";
+    let commandDuration: number | null = null;
+
+    try {
+      const res = await fetch("/api/generate-command", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          level: gs.sexiness_level,
+          players: readyPlayers.map((p) => ({
+            name: p.name,
+            tags: p.consented_tags,
+          })),
+          usedIds: gs.completed_command_ids,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        commandText = data.command;
+        commandCategory = data.category ?? "Algemeen";
+        commandDuration = data.duration_seconds ?? null;
+      }
+    } catch {
+      // AI unavailable — use local matchmaker below
+    }
+
+    // Local matchmaker fallback
+    const match = findBestMatch(readyPlayers, gs.sexiness_level, gs.completed_command_ids);
     if (!match) return;
 
     const { playerA, playerB, command } = match;
-    const consentedPlayers = [playerA.id, playerB.id];
+
+    if (!commandText) {
+      commandText = command.command
+        .replace(/{A}/g, playerA.name)
+        .replace(/{B}/g, playerB.name)
+        .replace(/{C}/g, players[2]?.name ?? "de groep");
+      commandCategory = command.category;
+      commandDuration = command.duration_seconds;
+    } else {
+      // AI command: still inject player names for context
+      commandText = commandText
+        .replace(/{A}/g, playerA.name)
+        .replace(/{B}/g, playerB.name);
+    }
+
     const initConsented: Record<string, boolean | null> = {};
-    consentedPlayers.forEach((id) => { initConsented[id] = null; });
+    [playerA.id, playerB.id].forEach((id) => { initConsented[id] = null; });
 
     await openConsentGate(code, {
       player_a_id: playerA.id,
       player_b_id: playerB.id,
       player_a_name: playerA.name,
       player_b_name: playerB.name,
-      category: command.category,
+      category: commandCategory,
       level: gs.sexiness_level,
       consented: initConsented,
     });
+
+    // Store command text temporarily so host can reveal after consent
+    // We embed it in the gate state via a side-channel write after consent
+    (window as Window & { _pendingCommand?: { text: string; category: string; duration: number | null } })._pendingCommand = {
+      text: commandText,
+      category: commandCategory,
+      duration: commandDuration,
+    };
   }, [room, isHost, players, code]);
 
-  // ─── After consent: start execution ───────────────────────────────────────
+  // ─── After consent: reveal command ────────────────────────────────────────
   useEffect(() => {
     if (!isHost || !room) return;
     const gs = { ...DEFAULT_GAME_STATE, ...room.game_state };
@@ -135,44 +165,40 @@ export default function GamePage() {
     const allAccepted = Object.values(gate.consented).every((v) => v === true);
     if (!allAccepted) return;
 
-    // Get the actual command from matchmaker (re-run with gate data)
-    const pA = players.find((p) => p.id === gate.player_a_id);
-    const pB = players.find((p) => p.id === gate.player_b_id);
-    if (!pA || !pB) return;
+    const pending = (window as Window & { _pendingCommand?: { text: string; category: string; duration: number | null } })._pendingCommand;
 
-    const match = findBestMatch(
-      [pA, pB],
-      gate.level,
-      gs.completed_command_ids
-    );
-    if (!match) return;
-
-    const cmd = match.command;
-    const resolvedCommand = cmd.command
-      .replace(/{A}/g, gate.player_a_name)
-      .replace(/{B}/g, gate.player_b_name)
-      .replace(/{C}/g, players[2]?.name ?? "de groep");
-
-    startCommand(
-      code,
-      resolvedCommand,
-      [gate.player_a_id, gate.player_b_id],
-      [gate.player_a_name, gate.player_b_name],
-      cmd.category,
-      gate.level,
-      cmd.duration_seconds
-    );
+    if (pending) {
+      delete (window as Window & { _pendingCommand?: unknown })._pendingCommand;
+      startCommand(
+        code,
+        pending.text,
+        [gate.player_a_id, gate.player_b_id],
+        [gate.player_a_name, gate.player_b_name],
+        pending.category,
+        gate.level,
+        pending.duration
+      );
+    } else {
+      // Fallback: re-run matchmaker
+      const pA = players.find((p) => p.id === gate.player_a_id);
+      const pB = players.find((p) => p.id === gate.player_b_id);
+      if (!pA || !pB) return;
+      const match = findBestMatch([pA, pB], gate.level, gs.completed_command_ids);
+      if (!match) return;
+      const cmd = match.command;
+      const resolved = cmd.command
+        .replace(/{A}/g, gate.player_a_name)
+        .replace(/{B}/g, gate.player_b_name)
+        .replace(/{C}/g, players[2]?.name ?? "de groep");
+      startCommand(code, resolved, [gate.player_a_id, gate.player_b_id],
+        [gate.player_a_name, gate.player_b_name], cmd.category, gate.level, cmd.duration_seconds);
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [room?.game_state?.subphase, room?.game_state?.consent_gate]);
 
-  // ─── My player data ────────────────────────────────────────────────────────
   const me = players.find((p) => p.id === playerId);
   const gs = room ? { ...DEFAULT_GAME_STATE, ...room.game_state } : DEFAULT_GAME_STATE;
 
-  // ─── Flash overlay ─────────────────────────────────────────────────────────
-  const { showFlash } = useGameStore();
-
-  // ─── Render ────────────────────────────────────────────────────────────────
   if (!room) {
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
@@ -188,7 +214,6 @@ export default function GamePage() {
       <PauseOverlay />
       <PanicButton />
 
-      {/* Flash overlay */}
       <AnimatePresence>
         {showFlash && (
           <motion.div
@@ -203,16 +228,14 @@ export default function GamePage() {
         )}
       </AnimatePresence>
 
-      {/* Secret mission overlay */}
       {activeSecretMission && (
         <SecretMissionOverlay
           mission={activeSecretMission}
-          onComplete={() => setActiveSecretMission(null)}
-          onFail={() => setActiveSecretMission(null)}
+          onComplete={() => clearSecretMission(code, playerId!)}
+          onFail={() => clearSecretMission(code, playerId!)}
         />
       )}
 
-      {/* ── CONSENT GATE ── */}
       {gs.subphase === "consent_gate" && gs.consent_gate && (
         <>
           {isHost ? (
@@ -229,7 +252,6 @@ export default function GamePage() {
         </>
       )}
 
-      {/* ── EXECUTING ── */}
       {gs.subphase === "executing" && gs.active_command && (
         <CommandScreen
           command={gs.active_command}
@@ -241,15 +263,12 @@ export default function GamePage() {
         />
       )}
 
-      {/* ── RATING ── */}
       {gs.subphase === "rating" && (
         <RatingScreen onDone={() => { if (isHost) finishRating(code); }} />
       )}
 
-      {/* ── IDLE ── */}
       {gs.subphase === "idle" && (
         <div className="flex flex-col min-h-screen px-6 py-10">
-          {/* Header */}
           <div className="flex items-center justify-between mb-8">
             <div>
               <p className="text-xs tracking-widest uppercase" style={{ color: "rgba(255,255,255,0.3)" }}>
@@ -271,7 +290,6 @@ export default function GamePage() {
             </div>
           </div>
 
-          {/* Main content */}
           <div className="flex-1 flex flex-col items-center justify-center gap-8">
             {isHost ? (
               <>
@@ -283,7 +301,6 @@ export default function GamePage() {
                 >
                   GENEREER OPDRACHT →
                 </motion.button>
-
                 <p className="text-xs text-center" style={{ color: "rgba(255,255,255,0.25)" }}>
                   {players.filter((p) => p.setup_complete).length}/{players.length} spelers klaar
                 </p>
@@ -298,7 +315,6 @@ export default function GamePage() {
             )}
           </div>
 
-          {/* Tension meter at bottom */}
           <TensionMeter tension={gs.tension} />
         </div>
       )}

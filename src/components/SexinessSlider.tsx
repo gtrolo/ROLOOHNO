@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useRef } from "react";
-import { LEVEL_NAMES } from "@/lib/supabase";
+import { LEVEL_NAMES } from "@/lib/firebase";
 
 type Props = {
   value: number; // 1–5

@@ -1,0 +1,22 @@
+{
+  "rules": {
+    "rooms": {
+      "$roomCode": {
+        ".read": true,
+        ".write": true,
+        "players": {
+          "$playerId": {
+            ".read": true,
+            ".write": true
+          }
+        },
+        "secret_missions": {
+          "$playerId": {
+            ".read": true,
+            ".write": true
+          }
+        }
+      }
+    }
+  }
+}

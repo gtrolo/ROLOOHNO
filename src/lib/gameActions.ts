@@ -1,212 +1,198 @@
-import { supabase, GameState, DEFAULT_GAME_STATE, ConsentGateState, ActiveCommand } from "./supabase";
-import { v4 as uuidv4 } from "uuid";
+import { db, ref, set, update, get, remove, DEFAULT_GAME_STATE } from "./firebase";
+import type { ConsentGateState, GameState, Room, Player } from "./firebase";
 
-async function getRoomByCode(roomCode: string) {
-  const { data } = await supabase
-    .from("rooms")
-    .select("*")
-    .eq("room_code", roomCode.toUpperCase())
-    .single();
-  return data;
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+async function getRoomByCode(code: string): Promise<Room | null> {
+  const snap = await get(ref(db, `rooms/${code.toUpperCase()}`));
+  return snap.exists() ? (snap.val() as Room) : null;
 }
 
-async function patchGameState(roomId: string, patch: Partial<GameState>) {
-  const { data: room } = await supabase
-    .from("rooms")
-    .select("game_state")
-    .eq("id", roomId)
-    .single();
-
-  if (!room) throw new Error("Room not found");
-
+async function patchGameState(code: string, patch: Partial<GameState>) {
+  const room = await getRoomByCode(code);
+  if (!room) return;
   const merged: GameState = { ...DEFAULT_GAME_STATE, ...room.game_state, ...patch };
-  const { error } = await supabase
-    .from("rooms")
-    .update({ game_state: merged })
-    .eq("id", roomId);
-
-  if (error) throw error;
-  return merged;
+  await update(ref(db, `rooms/${code.toUpperCase()}`), { game_state: merged });
 }
 
-export async function startSetupPhase(roomCode: string) {
-  const room = await getRoomByCode(roomCode);
-  if (!room) throw new Error("Room not found");
-  return patchGameState(room.id, { phase: "setup", subphase: "idle" });
+// ─── Room / Player Creation ───────────────────────────────────────────────────
+
+export async function createRoom(code: string, hostId: string): Promise<Room> {
+  const room: Room = {
+    id: code,
+    room_code: code,
+    host_id: hostId,
+    game_state: DEFAULT_GAME_STATE,
+    created_at: new Date().toISOString(),
+    paused: false,
+  };
+  await set(ref(db, `rooms/${code}`), room);
+  return room;
 }
 
-export async function startPlayingPhase(roomCode: string) {
-  const room = await getRoomByCode(roomCode);
-  if (!room) throw new Error("Room not found");
-  return patchGameState(room.id, { phase: "playing", subphase: "idle" });
+export async function joinRoom(code: string, player: Player): Promise<void> {
+  await set(ref(db, `rooms/${code}/players/${player.id}`), player);
 }
 
-export async function updateSexinessLevel(roomCode: string, level: number) {
-  const room = await getRoomByCode(roomCode);
-  if (!room) throw new Error("Room not found");
-  return patchGameState(room.id, { sexiness_level: level });
+export async function updatePlayer(code: string, playerId: string, patch: Partial<Player>): Promise<void> {
+  await update(ref(db, `rooms/${code}/players/${playerId}`), patch);
 }
 
-export async function openConsentGate(roomCode: string, gate: ConsentGateState) {
-  const room = await getRoomByCode(roomCode);
-  if (!room) throw new Error("Room not found");
-  return patchGameState(room.id, {
+// ─── Phase Transitions ────────────────────────────────────────────────────────
+
+export async function startSetupPhase(code: string): Promise<void> {
+  await patchGameState(code, { phase: "setup", subphase: "idle" });
+}
+
+export async function startPlayingPhase(code: string): Promise<void> {
+  await patchGameState(code, { phase: "playing", subphase: "idle" });
+}
+
+export async function updateSexinessLevel(code: string, level: number): Promise<void> {
+  await patchGameState(code, { sexiness_level: level });
+}
+
+// ─── Consent Gate ─────────────────────────────────────────────────────────────
+
+export async function openConsentGate(code: string, gate: ConsentGateState): Promise<void> {
+  await patchGameState(code, {
     subphase: "consent_gate",
     consent_gate: gate,
+    active_command: null,
   });
 }
 
-export async function recordConsent(
-  roomCode: string,
-  playerId: string,
-  accepted: boolean
-) {
-  const room = await getRoomByCode(roomCode);
-  if (!room) throw new Error("Room not found");
+export async function recordConsent(code: string, playerId: string, accepted: boolean): Promise<void> {
+  const room = await getRoomByCode(code);
+  if (!room) return;
   const gs: GameState = { ...DEFAULT_GAME_STATE, ...room.game_state };
+  if (!gs.consent_gate) return;
 
-  if (!gs.consent_gate) throw new Error("No consent gate active");
-
-  const updatedGate: ConsentGateState = {
-    ...gs.consent_gate,
-    consented: { ...gs.consent_gate.consented, [playerId]: accepted },
-  };
+  const updatedConsented = { ...gs.consent_gate.consented, [playerId]: accepted };
 
   if (!accepted) {
-    // Veto: cancel, back to idle
-    const { data: player } = await supabase
-      .from("players")
-      .select("veto_tokens")
-      .eq("id", playerId)
-      .single();
+    const players = await getPlayers(code);
+    const player = players.find((p) => p.id === playerId);
     if (player && player.veto_tokens > 0) {
-      await supabase
-        .from("players")
-        .update({ veto_tokens: player.veto_tokens - 1 })
-        .eq("id", playerId);
+      await updatePlayer(code, playerId, { veto_tokens: player.veto_tokens - 1 });
     }
-    return patchGameState(room.id, {
+    await patchGameState(code, {
       subphase: "idle",
       consent_gate: null,
+      active_command: null,
     });
+    return;
   }
 
-  // Check if all required players have accepted
-  const allAccepted = Object.values(updatedGate.consented).every(
-    (v) => v === true
-  );
+  const newGate: ConsentGateState = { ...gs.consent_gate, consented: updatedConsented };
+  const allAccepted = Object.values(updatedConsented).every((v) => v === true);
 
   if (allAccepted) {
-    return patchGameState(room.id, {
-      subphase: "executing",
-      consent_gate: updatedGate,
-    });
+    await patchGameState(code, { subphase: "executing", consent_gate: newGate });
+  } else {
+    await patchGameState(code, { consent_gate: newGate });
   }
-
-  return patchGameState(room.id, { consent_gate: updatedGate });
 }
 
+// ─── Command Execution ────────────────────────────────────────────────────────
+
 export async function startCommand(
-  roomCode: string,
+  code: string,
   command: string,
   targetPlayerIds: string[],
   targetNames: string[],
   category: string,
   level: number,
   durationSeconds: number | null
-) {
-  const room = await getRoomByCode(roomCode);
-  if (!room) throw new Error("Room not found");
-  const gs: GameState = { ...DEFAULT_GAME_STATE, ...room.game_state };
-
-  const activeCommand: ActiveCommand = {
-    id: uuidv4(),
-    command,
-    target_player_ids: targetPlayerIds,
-    target_names: targetNames,
-    category,
-    level,
-    duration_seconds: durationSeconds,
-    started_at: new Date().toISOString(),
-    completed_by: [],
-  };
-
-  const newTension = Math.min(100, (gs.tension || 0) + level * 4);
-
-  return patchGameState(room.id, {
-    subphase: "executing",
-    active_command: activeCommand,
-    tension: newTension,
-    round: (gs.round || 0) + 1,
-    consent_gate: null,
-  });
-}
-
-export async function completeCommand(roomCode: string, playerId: string) {
-  const room = await getRoomByCode(roomCode);
-  if (!room) throw new Error("Room not found");
-  const gs: GameState = { ...DEFAULT_GAME_STATE, ...room.game_state };
-
-  if (!gs.active_command) return;
-
-  const completedBy = [...new Set([...gs.active_command.completed_by, playerId])];
-  const targetCount = gs.active_command.target_player_ids.length;
-  const allDone = completedBy.length >= Math.max(1, targetCount);
-
-  const updatedCommand: ActiveCommand = { ...gs.active_command, completed_by: completedBy };
-
-  if (allDone) {
-    return patchGameState(room.id, {
-      subphase: "rating",
-      active_command: updatedCommand,
-      completed_command_ids: [
-        ...gs.completed_command_ids,
-        gs.active_command.id,
-      ],
-    });
-  }
-
-  return patchGameState(room.id, { active_command: updatedCommand });
-}
-
-export async function finishRating(roomCode: string) {
-  const room = await getRoomByCode(roomCode);
-  if (!room) throw new Error("Room not found");
-  return patchGameState(room.id, {
-    subphase: "idle",
-    active_command: null,
-  });
-}
-
-export async function pauseGame(roomCode: string) {
-  const room = await getRoomByCode(roomCode);
-  if (!room) throw new Error("Room not found");
-  const gs: GameState = { ...DEFAULT_GAME_STATE, ...room.game_state };
-  const wasPaused = gs.phase === "paused";
-  return patchGameState(room.id, {
-    phase: wasPaused ? "playing" : "paused",
-  });
-}
-
-export async function sendSecretMission(
-  roomCode: string,
-  targetPlayerId: string,
-  mission: string,
-  durationSeconds: number = 300
-) {
-  const room = await getRoomByCode(roomCode);
-  if (!room) throw new Error("Room not found");
-
-  // Deliver via Supabase broadcast (channel-based, not DB)
-  await supabase.channel(`room:${roomCode}`).send({
-    type: "broadcast",
-    event: "SECRET_MISSION",
-    payload: {
-      id: uuidv4(),
-      target_player_id: targetPlayerId,
-      mission,
+): Promise<void> {
+  const cmdId = Date.now().toString(36);
+  await patchGameState(code, {
+    active_command: {
+      id: cmdId,
+      command,
+      target_player_ids: targetPlayerIds,
+      target_names: targetNames,
+      category,
+      level,
       duration_seconds: durationSeconds,
-      assigned_at: new Date().toISOString(),
+      started_at: new Date().toISOString(),
+      completed_by: [],
     },
   });
+}
+
+export async function completeCommand(code: string, playerId: string): Promise<void> {
+  const room = await getRoomByCode(code);
+  if (!room) return;
+  const gs: GameState = { ...DEFAULT_GAME_STATE, ...room.game_state };
+  if (!gs.active_command) return;
+
+  const completedBy = [...(gs.active_command.completed_by ?? []), playerId];
+  const allDone = gs.active_command.target_player_ids.every((id) => completedBy.includes(id));
+
+  if (allDone) {
+    const completedIds = [...gs.completed_command_ids, gs.active_command.id];
+    await patchGameState(code, {
+      subphase: "rating",
+      active_command: { ...gs.active_command, completed_by: completedBy },
+      completed_command_ids: completedIds,
+      tension: Math.min(100, gs.tension + Math.floor(gs.sexiness_level * 4)),
+    });
+  } else {
+    await patchGameState(code, {
+      active_command: { ...gs.active_command, completed_by: completedBy },
+    });
+  }
+}
+
+export async function finishRating(code: string): Promise<void> {
+  const room = await getRoomByCode(code);
+  if (!room) return;
+  const gs: GameState = { ...DEFAULT_GAME_STATE, ...room.game_state };
+  await patchGameState(code, {
+    subphase: "idle",
+    active_command: null,
+    consent_gate: null,
+    round: gs.round + 1,
+  });
+}
+
+// ─── Pause / Panic ────────────────────────────────────────────────────────────
+
+export async function pauseGame(code: string): Promise<void> {
+  await update(ref(db, `rooms/${code.toUpperCase()}`), { paused: true });
+}
+
+export async function resumeGame(code: string): Promise<void> {
+  await update(ref(db, `rooms/${code.toUpperCase()}`), { paused: false });
+}
+
+// ─── Secret Mission ───────────────────────────────────────────────────────────
+
+export async function sendSecretMission(
+  code: string,
+  targetPlayerId: string,
+  mission: string,
+  durationSeconds: number
+): Promise<void> {
+  await set(ref(db, `rooms/${code}/secret_missions/${targetPlayerId}`), {
+    id: Date.now().toString(36),
+    target_player_id: targetPlayerId,
+    mission,
+    duration_seconds: durationSeconds,
+    assigned_at: new Date().toISOString(),
+    completed: false,
+  });
+}
+
+export async function clearSecretMission(code: string, targetPlayerId: string): Promise<void> {
+  await remove(ref(db, `rooms/${code}/secret_missions/${targetPlayerId}`));
+}
+
+// ─── Util ─────────────────────────────────────────────────────────────────────
+
+export async function getPlayers(code: string): Promise<Player[]> {
+  const snap = await get(ref(db, `rooms/${code}/players`));
+  if (!snap.exists()) return [];
+  return Object.values(snap.val() as Record<string, Player>);
 }

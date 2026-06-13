@@ -3,7 +3,8 @@
 import { useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { supabase, Tag } from "@/lib/supabase";
+import { Tag } from "@/lib/firebase";
+import { updatePlayer } from "@/lib/gameActions";
 import { useGameStore } from "@/store/gameStore";
 import { TagPicker } from "@/components/TagPicker";
 import { PanicButton } from "@/components/PanicButton";
@@ -32,15 +33,11 @@ export default function SetupPage() {
     if (!playerId) return;
     setSaving(true);
     try {
-      await supabase
-        .from("players")
-        .update({
-          consented_tags: selected,
-          hard_limits: hardLimits,
-          setup_complete: true,
-        })
-        .eq("id", playerId);
-
+      await updatePlayer(code, playerId, {
+        consented_tags: selected,
+        hard_limits: hardLimits,
+        setup_complete: true,
+      });
       router.push(`/game/${code}`);
     } catch {
       setSaving(false);

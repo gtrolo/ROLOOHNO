@@ -3,18 +3,13 @@ import { z } from "zod";
 import { getRandomCommand } from "@/lib/commands";
 
 const RequestSchema = z.object({
-  playerA: z.string(),
-  playerB: z.string(),
   level: z.number().min(1).max(5),
-  category: z.string().optional(),
+  players: z.array(z.object({ name: z.string(), tags: z.array(z.string()) })).optional(),
+  // Legacy fields kept for compatibility
+  playerA: z.string().optional(),
+  playerB: z.string().optional(),
   availableTags: z.array(z.string()).optional(),
   usedIds: z.array(z.string()).optional(),
-});
-
-const ResponseSchema = z.object({
-  command: z.string(),
-  duration_seconds: z.number().nullable(),
-  requires_props: z.array(z.string()),
 });
 
 export async function POST(req: NextRequest) {
@@ -24,9 +19,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 
-  const { playerA, playerB, level, availableTags = [], usedIds = [] } = parsed.data;
+  const { level, players = [], usedIds = [] } = parsed.data;
+  const playerA = parsed.data.playerA ?? players[0]?.name ?? "Speler A";
+  const playerB = parsed.data.playerB ?? players[1]?.name ?? "Speler B";
+  const availableTags = parsed.data.availableTags ??
+    [...new Set(players.flatMap((p) => p.tags))];
 
-  // Try OpenRouter if key is set
+  // AI generation if key is configured
   if (process.env.OPENROUTER_API_KEY) {
     try {
       const prompt = buildPrompt(playerA, playerB, level, availableTags);
@@ -49,9 +48,12 @@ export async function POST(req: NextRequest) {
         const data = await res.json();
         const text = data.choices?.[0]?.message?.content?.trim() ?? "";
         if (text.length > 20) {
-          return NextResponse.json(
-            ResponseSchema.parse({ command: text, duration_seconds: null, requires_props: [] })
-          );
+          return NextResponse.json({
+            command: text,
+            category: "AI",
+            duration_seconds: null,
+            source: "ai",
+          });
         }
       }
     } catch {
@@ -59,23 +61,18 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  // Local fallback
+  // Local fallback — always works, no API key needed
   const cmd = getRandomCommand(level, usedIds, availableTags, 2);
   if (!cmd) {
     return NextResponse.json({ error: "No commands available" }, { status: 404 });
   }
 
-  const resolvedCommand = cmd.command
-    .replace(/{A}/g, playerA)
-    .replace(/{B}/g, playerB);
-
-  return NextResponse.json(
-    ResponseSchema.parse({
-      command: resolvedCommand,
-      duration_seconds: cmd.duration_seconds,
-      requires_props: cmd.requires_props,
-    })
-  );
+  return NextResponse.json({
+    command: cmd.command,
+    category: cmd.category,
+    duration_seconds: cmd.duration_seconds,
+    source: "local",
+  });
 }
 
 function buildPrompt(playerA: string, playerB: string, level: number, tags: string[]) {

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { SecretMission as SecretMissionType } from "@/lib/supabase";
+import { SecretMission as SecretMissionType } from "@/lib/firebase";
 import { TimerRing } from "./TimerRing";
 
 type Props = {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useGameStore } from "@/store/gameStore";
-import { supabase } from "@/lib/supabase";
+import { pauseGame, resumeGame } from "@/lib/gameActions";
 
 export function PanicButton() {
   const { room, isPaused, setPaused } = useGameStore();
@@ -12,11 +12,8 @@ export function PanicButton() {
     setPaused(next);
     if (navigator.vibrate) navigator.vibrate(next ? [200, 100, 200] : [50]);
     if (code) {
-      await supabase.channel(`game:${code}`).send({
-        type: "broadcast",
-        event: "PANIC",
-        payload: { paused: next },
-      });
+      if (next) await pauseGame(code);
+      else await resumeGame(code);
     }
   }
 

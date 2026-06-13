@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { Player, Room, SecretMission } from "@/lib/supabase";
+import { Player, Room, SecretMission } from "@/lib/firebase";
 
 type GameStore = {
   // Identity

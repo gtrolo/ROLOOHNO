@@ -1,9 +1,32 @@
-import { createClient } from "@supabase/supabase-js";
+import { initializeApp, getApps } from "firebase/app";
+import {
+  getDatabase,
+  ref,
+  set,
+  update,
+  get,
+  onValue,
+  push,
+  remove,
+  off,
+  type DatabaseReference,
+} from "firebase/database";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "https://placeholder.supabase.co";
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "placeholder";
+const firebaseConfig = {
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY ?? "placeholder",
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN ?? "placeholder",
+  databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL ?? "https://placeholder-default-rtdb.firebaseio.com",
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? "placeholder",
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET ?? "placeholder",
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID ?? "placeholder",
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID ?? "placeholder",
+};
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
+export const db = getDatabase(app);
+
+export { ref, set, update, get, onValue, push, remove, off };
+export type { DatabaseReference };
 
 // ─── Domain Types ─────────────────────────────────────────────────────────────
 
@@ -17,7 +40,7 @@ export type ConsentGateState = {
   player_b_name: string;
   category: string;
   level: number;
-  consented: Record<string, boolean | null>; // playerId -> true/false/null
+  consented: Record<string, boolean | null>;
 };
 
 export type ActiveCommand = {
@@ -45,7 +68,7 @@ export type GameState = {
   phase: GamePhase;
   subphase: GameSubphase;
   sexiness_level: number;
-  tension: number; // 0–100
+  tension: number;
   active_players: string[];
   consent_gate: ConsentGateState | null;
   active_command: ActiveCommand | null;
@@ -73,6 +96,7 @@ export type Room = {
   host_id: string;
   game_state: GameState;
   created_at: string;
+  paused?: boolean;
 };
 
 export type Player = {
