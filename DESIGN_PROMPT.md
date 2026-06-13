@@ -319,7 +319,7 @@ After all screens: produce a **Screen Flow Diagram** showing how all 15 screens 
 
 ### CONTEXT FOR THE AI
 
-This app is used in the following scenario: 6–12 consenting adults at a private party, all holding their own phones, with one larger screen (tablet/TV) acting as the host display. The experience must feel premium, private, and intentional — like a Berghain wristband check, not a game show. Every design decision should heighten anticipation, not reduce friction to zero. Some friction is the product. The wait before a command is revealed is part of the experience.
+This app is used in the following scenario: 2–12 consenting adults at a private party, all holding their own phones, with one larger screen (tablet/TV) acting as the host display. The experience must feel premium, private, and intentional — like a Berghain wristband check, not a game show. Every design decision should heighten anticipation, not reduce friction to zero. Some friction is the product. The wait before a command is revealed is part of the experience.
 
 The target user has been to sex-positive events, uses apps like Feeld and Pure, owns dark-mode everything, and would immediately close an app that looks like it was made with a Bootstrap template.
 
