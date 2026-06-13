@@ -1,9 +1,15 @@
 @import "tailwindcss";
 
 :root {
-  --pink: #FF007F;
-  --amber: #FFBF00;
-  --charcoal: #121212;
+  --red: #C0392B;
+  --red-light: #E74C3C;
+  --red-dim: rgba(192, 57, 43, 0.15);
+  --red-border: rgba(192, 57, 43, 0.4);
+  --card: #1A1A1A;
+  --card-hover: #222222;
+  --surface: #111111;
+  --divider: rgba(255,255,255,0.07);
+  --text-secondary: #8E8E93;
 }
 
 * {
@@ -11,14 +17,11 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-html,
-body {
-  background: #000000;
+html, body {
+  background: #0D0D0D;
   color: #ffffff;
   font-family: "Inter", system-ui, sans-serif;
   overscroll-behavior: none;
 }
 
-input::placeholder {
-  color: #555;
-}
+input::placeholder { color: #555; }

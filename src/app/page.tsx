@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { v4 as uuidv4 } from "uuid";
 import { createRoom, joinRoom } from "@/lib/roomUtils";
-import { joinRoom as fbJoinRoom, startPlayingPhase, updatePlayer } from "@/lib/gameActions";
+import { joinRoom as fbJoinRoom, startPlayingPhase } from "@/lib/gameActions";
 import { AVATAR_COLORS } from "@/lib/firebase";
 import { useGameStore } from "@/store/gameStore";
 
@@ -22,200 +22,147 @@ export default function HomePage() {
 
   async function handleCreate() {
     if (!name.trim()) return;
-    setLoading(true);
-    setError("");
+    setLoading(true); setError("");
     try {
       const id = uuidv4();
-      setPlayer(id, name.trim());
-      setIsHost(true);
+      setPlayer(id, name.trim()); setIsHost(true);
       const roomCode = await createRoom(id);
       router.push(`/lobby/${roomCode}`);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Fout bij aanmaken.");
-    } finally {
-      setLoading(false);
-    }
+    } catch (e: unknown) { setError(e instanceof Error ? e.message : "Fout bij aanmaken."); }
+    finally { setLoading(false); }
   }
 
   async function handleDemo() {
     setLoading(true);
     try {
       const hostId = uuidv4();
-      setPlayer(hostId, "Jij");
-      setIsHost(true);
+      setPlayer(hostId, "Jij"); setIsHost(true);
       const roomCode = await createRoom(hostId);
-
       const allTags = ["Kussen","Aanraken","Blinddoek","Spanking","Rollenspel","Dominantie","Submissie"];
-      const demoPlayers = [
-        { name: "Alex", tags: ["Kussen","Aanraken","Blinddoek","Spanking"] },
-        { name: "Sam",  tags: ["Kussen","Aanraken","Rollenspel","Dominantie","Submissie"] },
-      ];
-
-      // Add host as player
-      await fbJoinRoom(roomCode, {
-        id: hostId, room_id: roomCode, name: "Jij",
-        avatar_color: AVATAR_COLORS[0], consented_tags: allTags,
-        hard_limits: [], veto_tokens: 2, status: "active", setup_complete: true,
-      });
-
-      // Add demo bots
-      for (let i = 0; i < demoPlayers.length; i++) {
-        const p = demoPlayers[i];
-        const pid = uuidv4();
-        await fbJoinRoom(roomCode, {
-          id: pid, room_id: roomCode, name: p.name,
-          avatar_color: AVATAR_COLORS[i + 1], consented_tags: p.tags,
-          hard_limits: [], veto_tokens: 2, status: "active", setup_complete: true,
-        });
+      const bots = [{ name: "Alex", tags: ["Kussen","Aanraken","Blinddoek","Spanking"] }, { name: "Sam", tags: ["Kussen","Aanraken","Rollenspel","Dominantie","Submissie"] }];
+      await fbJoinRoom(roomCode, { id: hostId, room_id: roomCode, name: "Jij", avatar_color: AVATAR_COLORS[0], consented_tags: allTags, hard_limits: [], veto_tokens: 2, status: "active", setup_complete: true });
+      for (let i = 0; i < bots.length; i++) {
+        await fbJoinRoom(roomCode, { id: uuidv4(), room_id: roomCode, name: bots[i].name, avatar_color: AVATAR_COLORS[i+1], consented_tags: bots[i].tags, hard_limits: [], veto_tokens: 2, status: "active", setup_complete: true });
       }
-
       await startPlayingPhase(roomCode);
       router.push(`/game/${roomCode}`);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Demo fout.");
-    } finally {
-      setLoading(false);
-    }
+    } catch (e: unknown) { setError(e instanceof Error ? e.message : "Demo fout."); }
+    finally { setLoading(false); }
   }
 
   async function handleJoin() {
     if (!name.trim() || code.length < 4) return;
-    setLoading(true);
-    setError("");
+    setLoading(true); setError("");
     try {
       const id = uuidv4();
-      setPlayer(id, name.trim());
-      setIsHost(false);
+      setPlayer(id, name.trim()); setIsHost(false);
       await joinRoom(code.trim(), name.trim(), id);
       router.push(`/lobby/${code.toUpperCase()}`);
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Fout bij joinen.");
-    } finally {
-      setLoading(false);
-    }
+    } catch (e: unknown) { setError(e instanceof Error ? e.message : "Fout bij joinen."); }
+    finally { setLoading(false); }
   }
 
+  const inputStyle = {
+    backgroundColor: "#1A1A1A",
+    border: "1px solid rgba(255,255,255,0.1)",
+    borderRadius: 12,
+    color: "#fff",
+    padding: "14px 16px",
+    fontSize: 16,
+    width: "100%",
+    outline: "none",
+  };
+
+  const primaryBtn = {
+    backgroundColor: "var(--red)",
+    color: "#fff",
+    borderRadius: 12,
+    padding: "16px",
+    width: "100%",
+    fontWeight: 700,
+    fontSize: 14,
+    letterSpacing: "0.05em",
+    border: "none",
+    cursor: "pointer",
+    opacity: loading ? 0.5 : 1,
+  };
+
+  const secondaryBtn = {
+    backgroundColor: "transparent",
+    color: "var(--text-secondary)",
+    borderRadius: 12,
+    padding: "14px",
+    width: "100%",
+    fontWeight: 600,
+    fontSize: 13,
+    letterSpacing: "0.05em",
+    border: "1px solid rgba(255,255,255,0.1)",
+    cursor: "pointer",
+  };
+
   return (
-    <main className="min-h-screen bg-black flex flex-col items-center justify-center px-6">
+    <main className="min-h-screen flex flex-col items-center justify-center px-5" style={{ backgroundColor: "#0D0D0D" }}>
       <AnimatePresence mode="wait">
         {mode === "home" && (
-          <motion.div
-            key="home"
-            initial={{ opacity: 0, y: 24 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -24 }}
-            className="flex flex-col items-center gap-12 w-full max-w-sm"
-          >
+          <motion.div key="home" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}
+            className="flex flex-col gap-10 w-full max-w-sm">
             <div className="text-center">
-              <h1 className="text-5xl font-black tracking-widest text-white mb-2">
-                ROLOOHNO
-              </h1>
-              <p className="text-white/30 text-xs tracking-[0.2em] uppercase">
-                Party Engine
-              </p>
+              <h1 className="text-5xl font-black tracking-widest text-white mb-1">ROLOOHNO</h1>
+              <div className="w-12 h-0.5 mx-auto mb-3" style={{ backgroundColor: "var(--red)" }} />
+              <p className="text-xs tracking-widest uppercase" style={{ color: "var(--text-secondary)" }}>Party Engine</p>
             </div>
-
-            <div className="flex flex-col gap-4 w-full">
-              <button
-                onClick={() => setMode("create")}
-                className="w-full py-4 bg-[#FF007F] text-black font-bold text-sm tracking-widest uppercase rounded-none hover:bg-white transition-colors"
-              >
+            <div className="flex flex-col gap-3">
+              <button onClick={() => setMode("create")} style={primaryBtn} className="transition-all active:scale-95">
                 Room Aanmaken
               </button>
-              <button
-                onClick={() => setMode("join")}
-                className="w-full py-4 border border-white/20 text-white font-bold text-sm tracking-widest uppercase rounded-none hover:border-[#FF007F] hover:text-[#FF007F] transition-colors"
-              >
+              <button onClick={() => setMode("join")} style={secondaryBtn} className="transition-all active:scale-95">
                 Room Joinen
               </button>
-
-              <button
-                onClick={handleDemo}
-                disabled={loading}
-                className="w-full py-3 text-white/30 font-bold text-xs tracking-widest uppercase rounded-none hover:text-[#FFBF00] hover:border-[#FFBF00] border border-white/10 transition-colors disabled:opacity-30"
-              >
+              <button onClick={handleDemo} disabled={loading} style={{ ...secondaryBtn, color: loading ? "#444" : "#666" }} className="transition-all active:scale-95">
                 {loading ? "Laden..." : "⚡ Demo — test zonder spelers"}
               </button>
             </div>
+            <p className="text-center text-xs" style={{ color: "#444" }}>18+ • Alleen voor instemmende volwassenen</p>
           </motion.div>
         )}
 
         {mode === "create" && (
-          <motion.div
-            key="create"
-            initial={{ opacity: 0, x: 40 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -40 }}
-            className="flex flex-col gap-6 w-full max-w-sm"
-          >
-            <button
-              onClick={() => setMode("home")}
-              className="text-white/30 text-xs tracking-widest uppercase self-start hover:text-white transition-colors"
-            >
-              ← Terug
+          <motion.div key="create" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }}
+            className="flex flex-col gap-5 w-full max-w-sm">
+            <button onClick={() => setMode("home")} className="flex items-center gap-2 text-sm self-start" style={{ color: "var(--text-secondary)" }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6" /></svg>
+              Terug
             </button>
-            <h2 className="text-2xl font-black tracking-widest text-white uppercase">
-              Jouw Naam
-            </h2>
-            <input
-              type="text"
-              placeholder="Naam..."
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              maxLength={20}
-              className="bg-[#121212] border-b border-white/20 text-white text-lg py-3 px-0 outline-none focus:border-[#FF007F] transition-colors w-full"
-            />
-            {error && <p className="text-red-400 text-xs">{error}</p>}
-            <button
-              onClick={handleCreate}
-              disabled={!name.trim() || loading}
-              className="w-full py-4 bg-[#FF007F] text-black font-bold text-sm tracking-widest uppercase disabled:opacity-30 hover:bg-white transition-colors"
-            >
-              {loading ? "Aanmaken..." : "Room Aanmaken"}
+            <div>
+              <h2 className="text-2xl font-black text-white mb-1">Room Aanmaken</h2>
+              <p className="text-sm" style={{ color: "var(--text-secondary)" }}>Voer je naam in om te beginnen</p>
+            </div>
+            <input type="text" placeholder="Jouw naam..." value={name} onChange={(e) => setName(e.target.value)} maxLength={20} style={inputStyle} />
+            {error && <p className="text-sm" style={{ color: "var(--red-light)" }}>{error}</p>}
+            <button onClick={handleCreate} disabled={!name.trim() || loading} style={{ ...primaryBtn, opacity: !name.trim() || loading ? 0.4 : 1 }} className="transition-all active:scale-95">
+              {loading ? "Aanmaken..." : "Room Aanmaken →"}
             </button>
           </motion.div>
         )}
 
         {mode === "join" && (
-          <motion.div
-            key="join"
-            initial={{ opacity: 0, x: 40 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -40 }}
-            className="flex flex-col gap-6 w-full max-w-sm"
-          >
-            <button
-              onClick={() => setMode("home")}
-              className="text-white/30 text-xs tracking-widest uppercase self-start hover:text-white transition-colors"
-            >
-              ← Terug
+          <motion.div key="join" initial={{ opacity: 0, x: 30 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -30 }}
+            className="flex flex-col gap-5 w-full max-w-sm">
+            <button onClick={() => setMode("home")} className="flex items-center gap-2 text-sm self-start" style={{ color: "var(--text-secondary)" }}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6" /></svg>
+              Terug
             </button>
-            <h2 className="text-2xl font-black tracking-widest text-white uppercase">
-              Room Joinen
-            </h2>
-            <input
-              type="text"
-              placeholder="Naam..."
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              maxLength={20}
-              className="bg-[#121212] border-b border-white/20 text-white text-lg py-3 px-0 outline-none focus:border-[#FF007F] transition-colors w-full"
-            />
-            <input
-              type="text"
-              placeholder="Room Code (bijv. A8F2)..."
-              value={code}
-              onChange={(e) => setCode(e.target.value.toUpperCase())}
-              maxLength={4}
-              className="bg-[#121212] border-b border-white/20 text-white text-lg py-3 px-0 outline-none focus:border-[#FFBF00] transition-colors w-full tracking-widest"
-            />
-            {error && <p className="text-red-400 text-xs">{error}</p>}
-            <button
-              onClick={handleJoin}
-              disabled={!name.trim() || code.length < 4 || loading}
-              className="w-full py-4 border border-[#FFBF00] text-[#FFBF00] font-bold text-sm tracking-widest uppercase disabled:opacity-30 hover:bg-[#FFBF00] hover:text-black transition-colors"
-            >
-              {loading ? "Joinen..." : "Joinen"}
+            <div>
+              <h2 className="text-2xl font-black text-white mb-1">Room Joinen</h2>
+              <p className="text-sm" style={{ color: "var(--text-secondary)" }}>Voer de code in van de host</p>
+            </div>
+            <input type="text" placeholder="Jouw naam..." value={name} onChange={(e) => setName(e.target.value)} maxLength={20} style={inputStyle} />
+            <input type="text" placeholder="Room code (bijv. A7K2)..." value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} maxLength={4}
+              style={{ ...inputStyle, letterSpacing: "0.3em", fontWeight: 700 }} />
+            {error && <p className="text-sm" style={{ color: "var(--red-light)" }}>{error}</p>}
+            <button onClick={handleJoin} disabled={!name.trim() || code.length < 4 || loading}
+              style={{ ...primaryBtn, backgroundColor: "#8B4513", opacity: !name.trim() || code.length < 4 || loading ? 0.4 : 1 }} className="transition-all active:scale-95">
+              {loading ? "Joinen..." : "Joinen →"}
             </button>
           </motion.div>
         )}
