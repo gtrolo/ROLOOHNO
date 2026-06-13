@@ -1,65 +1,174 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { useRouter } from "next/navigation";
+import { v4 as uuidv4 } from "uuid";
+import { createRoom, joinRoom } from "@/lib/roomUtils";
+import { useGameStore } from "@/store/gameStore";
+
+type Mode = "home" | "create" | "join";
+
+export default function HomePage() {
+  const router = useRouter();
+  const { setPlayer, setIsHost } = useGameStore();
+  const [mode, setMode] = useState<Mode>("home");
+  const [name, setName] = useState("");
+  const [code, setCode] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  async function handleCreate() {
+    if (!name.trim()) return;
+    setLoading(true);
+    setError("");
+    try {
+      const id = uuidv4();
+      setPlayer(id, name.trim());
+      setIsHost(true);
+      const roomCode = await createRoom(id);
+      router.push(`/lobby/${roomCode}`);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Fout bij aanmaken.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleJoin() {
+    if (!name.trim() || code.length < 4) return;
+    setLoading(true);
+    setError("");
+    try {
+      const id = uuidv4();
+      setPlayer(id, name.trim());
+      setIsHost(false);
+      await joinRoom(code.trim(), name.trim(), id);
+      router.push(`/lobby/${code.toUpperCase()}`);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Fout bij joinen.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+    <main className="min-h-screen bg-black flex flex-col items-center justify-center px-6">
+      <AnimatePresence mode="wait">
+        {mode === "home" && (
+          <motion.div
+            key="home"
+            initial={{ opacity: 0, y: 24 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -24 }}
+            className="flex flex-col items-center gap-12 w-full max-w-sm"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
+            <div className="text-center">
+              <h1 className="text-5xl font-black tracking-widest text-white mb-2">
+                ROLOOHNO
+              </h1>
+              <p className="text-white/30 text-xs tracking-[0.2em] uppercase">
+                Party Engine
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-4 w-full">
+              <button
+                onClick={() => setMode("create")}
+                className="w-full py-4 bg-[#FF007F] text-black font-bold text-sm tracking-widest uppercase rounded-none hover:bg-white transition-colors"
+              >
+                Room Aanmaken
+              </button>
+              <button
+                onClick={() => setMode("join")}
+                className="w-full py-4 border border-white/20 text-white font-bold text-sm tracking-widest uppercase rounded-none hover:border-[#FF007F] hover:text-[#FF007F] transition-colors"
+              >
+                Room Joinen
+              </button>
+            </div>
+          </motion.div>
+        )}
+
+        {mode === "create" && (
+          <motion.div
+            key="create"
+            initial={{ opacity: 0, x: 40 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -40 }}
+            className="flex flex-col gap-6 w-full max-w-sm"
+          >
+            <button
+              onClick={() => setMode("home")}
+              className="text-white/30 text-xs tracking-widest uppercase self-start hover:text-white transition-colors"
+            >
+              ← Terug
+            </button>
+            <h2 className="text-2xl font-black tracking-widest text-white uppercase">
+              Jouw Naam
+            </h2>
+            <input
+              type="text"
+              placeholder="Naam..."
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              maxLength={20}
+              className="bg-[#121212] border-b border-white/20 text-white text-lg py-3 px-0 outline-none focus:border-[#FF007F] transition-colors w-full"
             />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            {error && <p className="text-red-400 text-xs">{error}</p>}
+            <button
+              onClick={handleCreate}
+              disabled={!name.trim() || loading}
+              className="w-full py-4 bg-[#FF007F] text-black font-bold text-sm tracking-widest uppercase disabled:opacity-30 hover:bg-white transition-colors"
+            >
+              {loading ? "Aanmaken..." : "Room Aanmaken"}
+            </button>
+          </motion.div>
+        )}
+
+        {mode === "join" && (
+          <motion.div
+            key="join"
+            initial={{ opacity: 0, x: 40 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -40 }}
+            className="flex flex-col gap-6 w-full max-w-sm"
           >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+            <button
+              onClick={() => setMode("home")}
+              className="text-white/30 text-xs tracking-widest uppercase self-start hover:text-white transition-colors"
+            >
+              ← Terug
+            </button>
+            <h2 className="text-2xl font-black tracking-widest text-white uppercase">
+              Room Joinen
+            </h2>
+            <input
+              type="text"
+              placeholder="Naam..."
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              maxLength={20}
+              className="bg-[#121212] border-b border-white/20 text-white text-lg py-3 px-0 outline-none focus:border-[#FF007F] transition-colors w-full"
+            />
+            <input
+              type="text"
+              placeholder="Room Code (bijv. A8F2)..."
+              value={code}
+              onChange={(e) => setCode(e.target.value.toUpperCase())}
+              maxLength={4}
+              className="bg-[#121212] border-b border-white/20 text-white text-lg py-3 px-0 outline-none focus:border-[#FFBF00] transition-colors w-full tracking-widest"
+            />
+            {error && <p className="text-red-400 text-xs">{error}</p>}
+            <button
+              onClick={handleJoin}
+              disabled={!name.trim() || code.length < 4 || loading}
+              className="w-full py-4 border border-[#FFBF00] text-[#FFBF00] font-bold text-sm tracking-widest uppercase disabled:opacity-30 hover:bg-[#FFBF00] hover:text-black transition-colors"
+            >
+              {loading ? "Joinen..." : "Joinen"}
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </main>
   );
 }
