@@ -133,6 +133,23 @@ export default function GamePage() {
         .replace(/{B}/g, playerB.name);
     }
 
+    // Demo mode: skip consent gate, go straight to executing
+    const isDemoMode = players.every((p) => p.id === playerId || ["Alex","Sam","Kim","Jesse"].includes(p.name));
+    if (isDemoMode) {
+      (window as Window & { _pendingCommand?: { text: string; category: string; duration: number | null } })._pendingCommand = {
+        text: commandText,
+        category: commandCategory,
+        duration: commandDuration,
+      };
+      await startCommand(
+        code, commandText,
+        [playerA.id, playerB.id],
+        [playerA.name, playerB.name],
+        commandCategory, gs.sexiness_level, commandDuration
+      );
+      return;
+    }
+
     const initConsented: Record<string, boolean | null> = {};
     [playerA.id, playerB.id].forEach((id) => { initConsented[id] = null; });
 
@@ -146,8 +163,6 @@ export default function GamePage() {
       consented: initConsented,
     });
 
-    // Store command text temporarily so host can reveal after consent
-    // We embed it in the gate state via a side-channel write after consent
     (window as Window & { _pendingCommand?: { text: string; category: string; duration: number | null } })._pendingCommand = {
       text: commandText,
       category: commandCategory,

@@ -5,6 +5,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { v4 as uuidv4 } from "uuid";
 import { createRoom, joinRoom } from "@/lib/roomUtils";
+import { joinRoom as fbJoinRoom, startPlayingPhase, updatePlayer } from "@/lib/gameActions";
+import { AVATAR_COLORS } from "@/lib/firebase";
 import { useGameStore } from "@/store/gameStore";
 
 type Mode = "home" | "create" | "join";
@@ -30,6 +32,47 @@ export default function HomePage() {
       router.push(`/lobby/${roomCode}`);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Fout bij aanmaken.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleDemo() {
+    setLoading(true);
+    try {
+      const hostId = uuidv4();
+      setPlayer(hostId, "Jij");
+      setIsHost(true);
+      const roomCode = await createRoom(hostId);
+
+      const allTags = ["Kussen","Aanraken","Blinddoek","Spanking","Rollenspel","Dominantie","Submissie"];
+      const demoPlayers = [
+        { name: "Alex", tags: ["Kussen","Aanraken","Blinddoek","Spanking"] },
+        { name: "Sam",  tags: ["Kussen","Aanraken","Rollenspel","Dominantie","Submissie"] },
+      ];
+
+      // Add host as player
+      await fbJoinRoom(roomCode, {
+        id: hostId, room_id: roomCode, name: "Jij",
+        avatar_color: AVATAR_COLORS[0], consented_tags: allTags,
+        hard_limits: [], veto_tokens: 2, status: "active", setup_complete: true,
+      });
+
+      // Add demo bots
+      for (let i = 0; i < demoPlayers.length; i++) {
+        const p = demoPlayers[i];
+        const pid = uuidv4();
+        await fbJoinRoom(roomCode, {
+          id: pid, room_id: roomCode, name: p.name,
+          avatar_color: AVATAR_COLORS[i + 1], consented_tags: p.tags,
+          hard_limits: [], veto_tokens: 2, status: "active", setup_complete: true,
+        });
+      }
+
+      await startPlayingPhase(roomCode);
+      router.push(`/game/${roomCode}`);
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "Demo fout.");
     } finally {
       setLoading(false);
     }
@@ -84,6 +127,14 @@ export default function HomePage() {
                 className="w-full py-4 border border-white/20 text-white font-bold text-sm tracking-widest uppercase rounded-none hover:border-[#FF007F] hover:text-[#FF007F] transition-colors"
               >
                 Room Joinen
+              </button>
+
+              <button
+                onClick={handleDemo}
+                disabled={loading}
+                className="w-full py-3 text-white/30 font-bold text-xs tracking-widest uppercase rounded-none hover:text-[#FFBF00] hover:border-[#FFBF00] border border-white/10 transition-colors disabled:opacity-30"
+              >
+                {loading ? "Laden..." : "⚡ Demo — test zonder spelers"}
               </button>
             </div>
           </motion.div>
