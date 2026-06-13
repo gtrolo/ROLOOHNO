@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useCallback, useRef } from "react";
+import { useEffect, useCallback, useRef, Suspense } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { db, ref, onValue, off, Player, Room, DEFAULT_GAME_STATE, LEVEL_NAMES } from "@/lib/firebase";
@@ -19,6 +19,18 @@ import {
 import { findBestMatch } from "@/lib/matchmaker";
 
 export default function GamePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "#0D0D0D" }}>
+        <p className="text-sm animate-pulse" style={{ color: "var(--text-secondary)" }}>Laden...</p>
+      </div>
+    }>
+      <GamePageInner />
+    </Suspense>
+  );
+}
+
+function GamePageInner() {
   const { code } = useParams<{ code: string }>();
   const searchParams = useSearchParams();
   const {
