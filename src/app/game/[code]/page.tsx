@@ -3,7 +3,7 @@
 import { useEffect, useCallback, useRef, Suspense } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { db, ref, onValue, off, Player, Room, DEFAULT_GAME_STATE, LEVEL_NAMES } from "@/lib/firebase";
+import { db, ref, onValue, off, Player, Room, DEFAULT_GAME_STATE, LEVEL_NAMES, normalizeRoom, normalizePlayer } from "@/lib/firebase";
 import { useGameStore } from "@/store/gameStore";
 import { PanicButton } from "@/components/PanicButton";
 import { PauseOverlay } from "@/components/PauseOverlay";
@@ -65,7 +65,7 @@ function GamePageInner() {
     const rRef = ref(db, `rooms/${upper}`);
     onValue(rRef, (snap) => {
       if (!snap.exists()) return;
-      const data = snap.val() as Room;
+      const data = normalizeRoom(snap.val());
       setRoom(data);
       setPaused(!!data.paused);
       const gs = data.game_state;
@@ -78,7 +78,7 @@ function GamePageInner() {
     });
     const pRef = ref(db, `rooms/${upper}/players`);
     onValue(pRef, (snap) => {
-      setPlayers(snap.exists() ? Object.values(snap.val() as Record<string, Player>) : []);
+      setPlayers(snap.exists() ? Object.values(snap.val() as Record<string, unknown>).map(normalizePlayer) : []);
     });
     if (playerId) {
       const smRef = ref(db, `rooms/${upper}/secret_missions/${playerId}`);

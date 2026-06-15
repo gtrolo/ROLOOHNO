@@ -111,6 +111,46 @@ export type Player = {
   setup_complete: boolean;
 };
 
+// ─── Firebase Array Normalization ─────────────────────────────────────────────
+// Firebase RTDB drops empty arrays (stores as null) and returns non-empty arrays
+// as objects with numeric string keys. This helper converts them back to arrays.
+
+function toArr<T>(v: unknown): T[] {
+  if (Array.isArray(v)) return v as T[];
+  if (v && typeof v === "object") return Object.values(v) as T[];
+  return [];
+}
+
+export function normalizeRoom(raw: unknown): Room {
+  const r = raw as Record<string, unknown>;
+  const gs = (r.game_state ?? {}) as Record<string, unknown>;
+  const ac = gs.active_command as Record<string, unknown> | null | undefined;
+  return {
+    ...(r as Room),
+    game_state: {
+      ...(DEFAULT_GAME_STATE),
+      ...(gs as Partial<GameState>),
+      completed_command_ids: toArr<string>(gs.completed_command_ids),
+      active_players: toArr<string>(gs.active_players),
+      active_command: ac ? {
+        ...(ac as ActiveCommand),
+        target_player_ids: toArr<string>(ac.target_player_ids),
+        target_names: toArr<string>(ac.target_names),
+        completed_by: toArr<string>(ac.completed_by),
+      } : null,
+    },
+  };
+}
+
+export function normalizePlayer(raw: unknown): Player {
+  const p = raw as Record<string, unknown>;
+  return {
+    ...(p as Player),
+    consented_tags: toArr<string>(p.consented_tags),
+    hard_limits: toArr<string>(p.hard_limits),
+  };
+}
+
 // ─── Tag Definitions ──────────────────────────────────────────────────────────
 
 export const ALL_TAGS = [
