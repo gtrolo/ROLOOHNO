@@ -103,9 +103,10 @@ export async function startCommand(
   targetNames: string[],
   category: string,
   level: number,
-  durationSeconds: number | null
+  durationSeconds: number | null,
+  commandId?: string
 ): Promise<void> {
-  const cmdId = Date.now().toString(36);
+  const cmdId = commandId ?? Date.now().toString(36);
   await patchGameState(code, {
     subphase: "executing",
     active_command: {

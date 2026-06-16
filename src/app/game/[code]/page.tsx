@@ -134,7 +134,7 @@ function GamePageInner() {
     (window as Window & { _pendingCommand?: { text: string; category: string; duration: number | null } })._pendingCommand = { text: commandText, category: commandCategory, duration: commandDuration };
 
     if (isDemoMode) {
-      await startCommand(code, commandText, [playerA.id, playerB.id], [playerA.name, playerB.name], commandCategory, gs.sexiness_level, commandDuration);
+      await startCommand(code, commandText, [playerA.id, playerB.id], [playerA.name, playerB.name], commandCategory, gs.sexiness_level, commandDuration, command.id);
       return;
     }
 
@@ -161,7 +161,7 @@ function GamePageInner() {
       const match = findBestMatch([pA, pB], gate.level, gs.completed_command_ids);
       if (!match) return;
       const cmd = match.command;
-      startCommand(code, cmd.command.replace(/{A}/g, gate.player_a_name).replace(/{B}/g, gate.player_b_name).replace(/{C}/g, players[2]?.name ?? "de groep"), [gate.player_a_id, gate.player_b_id], [gate.player_a_name, gate.player_b_name], cmd.category, gate.level, cmd.duration_seconds);
+      startCommand(code, cmd.command.replace(/{A}/g, gate.player_a_name).replace(/{B}/g, gate.player_b_name).replace(/{C}/g, players[2]?.name ?? "de groep"), [gate.player_a_id, gate.player_b_id], [gate.player_a_name, gate.player_b_name], cmd.category, gate.level, cmd.duration_seconds, cmd.id);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [room?.game_state?.subphase, room?.game_state?.consent_gate]);
