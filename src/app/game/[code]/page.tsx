@@ -130,7 +130,7 @@ function GamePageInner() {
       commandText = commandText.replace(/{A}/g, playerA.name).replace(/{B}/g, playerB.name);
     }
 
-    const isDemoMode = players.every((p) => p.id === playerId || ["Alex","Sam","Kim","Jesse"].includes(p.name));
+    const isDemoMode = players.every((p) => p.id === playerId || ["Alex","Sam","Kim","Jesse","Jij"].includes(p.name));
     (window as Window & { _pendingCommand?: { text: string; category: string; duration: number | null } })._pendingCommand = { text: commandText, category: commandCategory, duration: commandDuration };
 
     if (isDemoMode) {

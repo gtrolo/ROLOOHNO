@@ -65,10 +65,12 @@ function PhoneFrame({ src }: { src: string }) {
       <iframe
         src={src}
         style={{
+          position: "absolute",
+          top: 34,
+          left: 0,
           width: "100%",
-          height: "100%",
+          height: "calc(100% - 34px)",
           border: "none",
-          paddingTop: 34,
           backgroundColor: "#0D0D0D",
         }}
       />
