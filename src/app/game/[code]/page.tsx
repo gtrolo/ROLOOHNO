@@ -15,6 +15,7 @@ import { SecretMissionOverlay } from "@/components/SecretMission";
 import {
   openConsentGate, recordConsent, startCommand,
   completeCommand, finishRating, pauseGame, clearSecretMission,
+  updateSexinessLevel,
 } from "@/lib/gameActions";
 import { findBestMatch } from "@/lib/matchmaker";
 
@@ -259,13 +260,6 @@ function GamePageInner() {
                     GENEREER OPDRACHT →
                   </button>
                 </div>
-
-                {/* Intensity bars */}
-                <div className="flex gap-1 items-end">
-                  {[1,2,3,4,5].map((n) => (
-                    <div key={n} className="w-6 rounded-sm transition-all" style={{ height: 8 + n * 4, backgroundColor: n <= gs.sexiness_level ? "var(--red)" : "#222" }} />
-                  ))}
-                </div>
               </>
             ) : (
               <div className="flex flex-col items-center gap-4">
@@ -276,6 +270,30 @@ function GamePageInner() {
                 <p className="text-xs" style={{ color: "var(--text-secondary)" }}>De host genereert de volgende opdracht</p>
               </div>
             )}
+
+            {/* Level picker — visible to everyone */}
+            <div className="w-full" style={{ backgroundColor: "var(--card)", borderRadius: 16, padding: "16px" }}>
+              <p className="text-xs uppercase tracking-wider font-medium mb-3" style={{ color: "var(--text-secondary)" }}>Intensiteit</p>
+              <div className="flex gap-2">
+                {([1,2,3,4,5] as const).map((n) => (
+                  <button
+                    key={n}
+                    onClick={() => updateSexinessLevel(code, n)}
+                    className="flex-1 py-2 text-xs font-bold rounded-lg transition-all active:scale-95"
+                    style={{
+                      backgroundColor: n === gs.sexiness_level ? "var(--red)" : "rgba(255,255,255,0.06)",
+                      color: n === gs.sexiness_level ? "#fff" : "var(--text-secondary)",
+                      border: n === gs.sexiness_level ? "none" : "1px solid rgba(255,255,255,0.08)",
+                    }}
+                  >
+                    {n}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs mt-2 text-center" style={{ color: "var(--text-secondary)" }}>
+                {LEVEL_NAMES[gs.sexiness_level]}
+              </p>
+            </div>
           </div>
 
           {/* Tension meter */}
