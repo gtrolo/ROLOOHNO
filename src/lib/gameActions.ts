@@ -156,10 +156,19 @@ export async function completeCommand(code: string, playerId: string): Promise<v
   }
 }
 
-export async function finishRating(code: string): Promise<void> {
+export async function finishRating(code: string, rating?: number | null, commandId?: string): Promise<void> {
   const room = await getRoomByCode(code);
   if (!room) return;
   const round = (room.game_state?.round ?? 0) + 1;
+
+  // Persist rating globally so AI can learn from it
+  if (rating != null && commandId) {
+    const ratingRef = ref(db, `command_ratings/${commandId}`);
+    const snap = await get(ratingRef);
+    const existing = snap.exists() ? (snap.val() as { count: number; sum: number }) : { count: 0, sum: 0 };
+    await set(ratingRef, { count: existing.count + 1, sum: existing.sum + rating });
+  }
+
   await patchGameState(code, {
     subphase: "idle",
     active_command: null,

@@ -629,11 +629,14 @@ export function getCommandById(id: string): Command | undefined {
   return COMMANDS.find((c) => c.id === id);
 }
 
+export type CommandRatings = Record<string, { count: number; sum: number }>;
+
 export function getRandomCommand(
   level: number,
   usedIds: string[] | null | undefined,
   availableTags: string[] | null | undefined,
-  targetCount: number = 2
+  targetCount: number = 2,
+  ratings?: CommandRatings
 ): Command | null {
   const safeUsed = Array.isArray(usedIds) ? usedIds : [];
   const safeTags = Array.isArray(availableTags) ? availableTags : [];
@@ -647,13 +650,30 @@ export function getRandomCommand(
     return true;
   });
 
-  // If pool is empty (all used), allow any command at this level regardless of used status
   const fallbackPool = pool.length > 0 ? pool : COMMANDS.filter(
     (c) => c.level <= level && c.level >= Math.max(1, level - 1) && c.target_count <= targetCount
   );
 
   if (fallbackPool.length === 0) return null;
-  return fallbackPool[Math.floor(Math.random() * fallbackPool.length)];
+
+  if (!ratings || Object.keys(ratings).length === 0) {
+    return fallbackPool[Math.floor(Math.random() * fallbackPool.length)];
+  }
+
+  // Weighted random: avg rating 0-4 → weight 0.1-2.0; unrated = weight 1.0 (neutral)
+  const weighted = fallbackPool.map((c) => {
+    const r = ratings[c.id];
+    const avg = r && r.count > 0 ? r.sum / r.count : 2;
+    return { c, weight: Math.max(0.1, avg / 2) };
+  });
+
+  const total = weighted.reduce((s, w) => s + w.weight, 0);
+  let rand = Math.random() * total;
+  for (const { c, weight } of weighted) {
+    rand -= weight;
+    if (rand <= 0) return c;
+  }
+  return weighted[weighted.length - 1].c;
 }
 
 // ─── LEVEL 1 extra (l1-26 t/m l1-100) ────────────────────────────────────────

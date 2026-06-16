@@ -11,14 +11,14 @@ const RATINGS = [
   { emoji: "💀", label: "Wauw" },
 ];
 
-type Props = { onDone: () => void; autoAdvanceSeconds?: number };
+type Props = { onDone: (rating: number | null) => void; autoAdvanceSeconds?: number };
 
 export function RatingScreen({ onDone, autoAdvanceSeconds = 10 }: Props) {
   const [selected, setSelected] = useState<number | null>(null);
   const [countdown, setCountdown] = useState(autoAdvanceSeconds);
 
   useEffect(() => {
-    if (countdown <= 0) { onDone(); return; }
+    if (countdown <= 0) { onDone(null); return; }
     const t = setTimeout(() => setCountdown((c) => c - 1), 1000);
     return () => clearTimeout(t);
   }, [countdown, onDone]);
@@ -26,7 +26,7 @@ export function RatingScreen({ onDone, autoAdvanceSeconds = 10 }: Props) {
   function pick(i: number) {
     setSelected(i);
     if (navigator.vibrate) navigator.vibrate(40);
-    setTimeout(onDone, 700);
+    setTimeout(() => onDone(i), 700);
   }
 
   return (
@@ -51,7 +51,7 @@ export function RatingScreen({ onDone, autoAdvanceSeconds = 10 }: Props) {
         ))}
       </div>
 
-      <button onClick={onDone} className="text-sm transition-all active:scale-95" style={{ color: "var(--text-secondary)" }}>
+      <button onClick={() => onDone(null)} className="text-sm transition-all active:scale-95" style={{ color: "var(--text-secondary)" }}>
         Volgende opdracht → ({countdown})
       </button>
     </motion.div>

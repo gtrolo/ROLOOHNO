@@ -3,7 +3,8 @@
 import { useEffect, useCallback, useRef, Suspense } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { db, ref, onValue, off, Player, Room, DEFAULT_GAME_STATE, LEVEL_NAMES, normalizeRoom, normalizePlayer } from "@/lib/firebase";
+import { db, ref, onValue, off, get, Player, Room, DEFAULT_GAME_STATE, LEVEL_NAMES, normalizeRoom, normalizePlayer } from "@/lib/firebase";
+import type { CommandRatings } from "@/lib/commands";
 import { useGameStore } from "@/store/gameStore";
 import { PanicButton } from "@/components/PanicButton";
 import { PauseOverlay } from "@/components/PauseOverlay";
@@ -120,7 +121,14 @@ function GamePageInner() {
       }
     } catch { /* use local fallback */ }
 
-    const match = findBestMatch(ready, gs.sexiness_level, gs.completed_command_ids);
+    // Load global ratings so high-rated commands are picked more often
+    let ratings: CommandRatings = {};
+    try {
+      const ratingsSnap = await get(ref(db, "command_ratings"));
+      if (ratingsSnap.exists()) ratings = ratingsSnap.val() as CommandRatings;
+    } catch { /* ratings optional */ }
+
+    const match = findBestMatch(ready, gs.sexiness_level, gs.completed_command_ids, ratings);
     if (!match) return;
     const { playerA, playerB, command } = match;
 
@@ -211,7 +219,9 @@ function GamePageInner() {
       )}
 
       {gs.subphase === "rating" && (
-        <RatingScreen onDone={() => { if (isHost) finishRating(code); }} />
+        <RatingScreen onDone={(rating) => {
+          if (isHost) finishRating(code, rating, gs.active_command?.id ?? undefined);
+        }} />
       )}
 
       {gs.subphase === "idle" && (

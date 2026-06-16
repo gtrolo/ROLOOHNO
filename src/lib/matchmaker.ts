@@ -1,5 +1,5 @@
 import { Player } from "./firebase";
-import { getRandomCommand, Command } from "./commands";
+import { getRandomCommand, Command, CommandRatings } from "./commands";
 
 export type MatchResult = {
   playerA: Player;
@@ -27,7 +27,8 @@ function tagOverlap(a: Player, b: Player): string[] {
 export function findBestMatch(
   players: Player[],
   sexinessLevel: number,
-  usedCommandIds: string[]
+  usedCommandIds: string[],
+  ratings?: CommandRatings
 ): MatchResult | null {
   if (players.length < 2) return null;
 
@@ -57,7 +58,8 @@ export function findBestMatch(
     sexinessLevel,
     usedCommandIds,
     allAvailableTags,
-    2
+    2,
+    ratings
   );
 
   if (!command) return null;
