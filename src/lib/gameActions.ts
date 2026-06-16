@@ -8,11 +8,14 @@ async function getRoomByCode(code: string): Promise<Room | null> {
   return snap.exists() ? (snap.val() as Room) : null;
 }
 
+// Atomic shallow-merge: only the specified keys change, others are untouched.
+// This prevents completed_command_ids from being reset by unrelated writes.
 async function patchGameState(code: string, patch: Partial<GameState>) {
-  const room = await getRoomByCode(code);
-  if (!room) return;
-  const merged: GameState = { ...DEFAULT_GAME_STATE, ...room.game_state, ...patch };
-  await update(ref(db, `rooms/${code.toUpperCase()}`), { game_state: merged });
+  const updates: Record<string, unknown> = {};
+  for (const [key, val] of Object.entries(patch)) {
+    updates[`game_state/${key}`] = val ?? null;
+  }
+  await update(ref(db, `rooms/${code.toUpperCase()}`), updates);
 }
 
 // ─── Room / Player Creation ───────────────────────────────────────────────────
@@ -156,12 +159,12 @@ export async function completeCommand(code: string, playerId: string): Promise<v
 export async function finishRating(code: string): Promise<void> {
   const room = await getRoomByCode(code);
   if (!room) return;
-  const gs: GameState = { ...DEFAULT_GAME_STATE, ...room.game_state };
+  const round = (room.game_state?.round ?? 0) + 1;
   await patchGameState(code, {
     subphase: "idle",
     active_command: null,
     consent_gate: null,
-    round: gs.round + 1,
+    round,
   });
 }
 
