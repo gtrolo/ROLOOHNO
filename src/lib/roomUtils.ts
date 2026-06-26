@@ -9,7 +9,7 @@ export function randomAvatarColor(): string {
   return AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)];
 }
 
-export async function createRoom(hostId: string): Promise<string> {
+export async function createRoom(hostId: string, hostName?: string): Promise<string> {
   let code = generateRoomCode();
   // Ensure unique code
   let snap = await get(ref(db, `rooms/${code}`));
@@ -18,6 +18,19 @@ export async function createRoom(hostId: string): Promise<string> {
     snap = await get(ref(db, `rooms/${code}`));
   }
   await fbCreateRoom(code, hostId);
+  if (hostName?.trim()) {
+    await fbJoinRoom(code, {
+      id: hostId,
+      room_id: code,
+      name: hostName.trim(),
+      avatar_color: AVATAR_COLORS[0],
+      consented_tags: [],
+      hard_limits: [],
+      veto_tokens: 2,
+      status: "waiting",
+      setup_complete: false,
+    });
+  }
   return code;
 }
 

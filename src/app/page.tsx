@@ -27,7 +27,7 @@ export default function HomePage() {
     try {
       const id = uuidv4();
       setPlayer(id, name.trim()); setIsHost(true);
-      const roomCode = await createRoom(id);
+      const roomCode = await createRoom(id, name.trim());
       router.push(`/lobby/${roomCode}`);
     } catch (e: unknown) { setError(e instanceof Error ? e.message : "Fout bij aanmaken."); }
     finally { setLoading(false); }

@@ -34,9 +34,7 @@ export default function LobbyPage() {
       if (data.game_state?.sexiness_level) setLocalLevel(data.game_state.sexiness_level);
       if (currentDeviceIsHost && !storedIsHost) setIsHost(true);
       setPaused(!!data.paused);
-      if (data.game_state?.phase === "setup") {
-        router.push(currentDeviceIsHost || storedIsHost ? `/game/${upper}` : `/setup/${upper}`);
-      }
+      if (data.game_state?.phase === "setup") router.push(`/setup/${upper}`);
     });
     const pRef = ref(db, `rooms/${upper}/players`);
     onValue(pRef, (snap) => {

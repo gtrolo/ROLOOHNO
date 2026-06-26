@@ -201,7 +201,7 @@ function GamePageInner() {
       )}
 
       {gs.subphase === "consent_gate" && gs.consent_gate && (
-        isHost
+        isHost && playerId !== gs.consent_gate.player_a_id && playerId !== gs.consent_gate.player_b_id
           ? <ConsentGateHostView gate={gs.consent_gate} />
           : <ConsentGatePlayerView gate={gs.consent_gate} playerId={playerId!} vetoTokens={me?.veto_tokens ?? 2}
               onAccept={() => recordConsent(code, playerId!, true)} onVeto={() => recordConsent(code, playerId!, false)} />
