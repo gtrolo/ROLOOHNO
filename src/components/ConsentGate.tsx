@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { ConsentGateState, LEVEL_NAMES } from "@/lib/firebase";
+import { ConsentGateState } from "@/lib/firebase";
 
 type HostViewProps = { gate: ConsentGateState };
 type PlayerViewProps = {
@@ -17,7 +17,8 @@ export function ConsentGateHostView({ gate }: HostViewProps) {
     { id: gate.player_a_id, name: gate.player_a_name },
     { id: gate.player_b_id, name: gate.player_b_name },
   ];
-  const consented = Object.values(gate.consented).filter(Boolean).length;
+  const consentedById = gate.consented ?? {};
+  const consented = players.filter((p) => consentedById[p.id] === true).length;
   const total = players.length;
 
   return (
@@ -84,7 +85,7 @@ export function ConsentGateHostView({ gate }: HostViewProps) {
         {/* Player status list */}
         <div style={{ backgroundColor: "var(--card)", borderRadius: 16, overflow: "hidden" }}>
           {players.map((p) => {
-            const status = gate.consented[p.id];
+            const status = consentedById[p.id] ?? "pending";
             return (
               <div key={p.id} className="flex items-center gap-3 px-4 py-4" style={{ borderBottom: "1px solid var(--divider)" }}>
                 <div className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm text-white" style={{ backgroundColor: "#2A2A2A" }}>
@@ -103,7 +104,7 @@ export function ConsentGateHostView({ gate }: HostViewProps) {
                     <span className="text-sm font-medium">Veto</span>
                   </div>
                 )}
-                {status === null && (
+                {status === "pending" && (
                   <span className="text-sm animate-pulse" style={{ color: "var(--text-secondary)" }}>Wacht...</span>
                 )}
               </div>
@@ -133,7 +134,7 @@ export function ConsentGateHostView({ gate }: HostViewProps) {
 
 export function ConsentGatePlayerView({ gate, playerId, vetoTokens, onAccept, onVeto }: PlayerViewProps) {
   const isInvolved = playerId === gate.player_a_id || playerId === gate.player_b_id;
-  const myStatus = gate.consented[playerId];
+  const myStatus = gate.consented?.[playerId] ?? "pending";
 
   if (!isInvolved) {
     return (
@@ -151,7 +152,7 @@ export function ConsentGatePlayerView({ gate, playerId, vetoTokens, onAccept, on
     );
   }
 
-  if (myStatus !== null) {
+  if (myStatus !== "pending") {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gap-4 px-8" style={{ backgroundColor: "#0D0D0D" }}>
         <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ backgroundColor: myStatus ? "rgba(76,175,80,0.15)" : "var(--red-dim)" }}>

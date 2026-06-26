@@ -163,8 +163,8 @@ function GamePageInner() {
         return;
       }
 
-      const initConsented: Record<string, boolean | null> = {};
-      [playerA.id, playerB.id].forEach((id) => { initConsented[id] = null; });
+      const initConsented: Record<string, boolean | "pending"> = {};
+      [playerA.id, playerB.id].forEach((id) => { initConsented[id] = "pending"; });
       await openConsentGate(code, { player_a_id: playerA.id, player_b_id: playerB.id, player_a_name: playerA.name, player_b_name: playerB.name, category: commandCategory, level: gs.sexiness_level, consented: initConsented });
     } catch {
       setGenerateError("Opdracht genereren lukte niet. Probeer opnieuw.");
@@ -179,7 +179,7 @@ function GamePageInner() {
     const gs = { ...gsRaw2, completed_command_ids: Array.isArray(gsRaw2.completed_command_ids) ? gsRaw2.completed_command_ids : [] };
     if (gs.subphase !== "executing" || !gs.consent_gate || gs.active_command) return;
     const gate = gs.consent_gate;
-    if (!Object.values(gate.consented).every((v) => v === true)) return;
+    if (![gate.player_a_id, gate.player_b_id].every((id) => gate.consented?.[id] === true)) return;
     const pending = (window as Window & { _pendingCommand?: { text: string; category: string; duration: number | null } })._pendingCommand;
     if (pending) {
       delete (window as Window & { _pendingCommand?: unknown })._pendingCommand;

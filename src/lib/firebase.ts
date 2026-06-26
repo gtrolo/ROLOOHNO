@@ -40,7 +40,7 @@ export type ConsentGateState = {
   player_b_name: string;
   category: string;
   level: number;
-  consented: Record<string, boolean | null>;
+  consented: Record<string, boolean | "pending">;
 };
 
 export type ActiveCommand = {

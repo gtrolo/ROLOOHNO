@@ -71,7 +71,7 @@ export async function recordConsent(code: string, playerId: string, accepted: bo
   const gs: GameState = { ...DEFAULT_GAME_STATE, ...room.game_state };
   if (!gs.consent_gate) return;
 
-  const updatedConsented = { ...gs.consent_gate.consented, [playerId]: accepted };
+  const updatedConsented = { ...(gs.consent_gate.consented ?? {}), [playerId]: accepted };
 
   if (!accepted) {
     const players = await getPlayers(code);
@@ -88,7 +88,8 @@ export async function recordConsent(code: string, playerId: string, accepted: bo
   }
 
   const newGate: ConsentGateState = { ...gs.consent_gate, consented: updatedConsented };
-  const allAccepted = Object.values(updatedConsented).every((v) => v === true);
+  const allAccepted = [gs.consent_gate.player_a_id, gs.consent_gate.player_b_id]
+    .every((id) => updatedConsented[id] === true);
 
   if (allAccepted) {
     await patchGameState(code, { subphase: "executing", consent_gate: newGate });
