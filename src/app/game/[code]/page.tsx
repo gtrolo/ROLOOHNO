@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useCallback, useRef, Suspense } from "react";
+import { useEffect, useCallback, Suspense } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { db, ref, onValue, off, get, Player, Room, DEFAULT_GAME_STATE, LEVEL_NAMES, normalizeRoom, normalizePlayer } from "@/lib/firebase";
+import { db, ref, onValue, off, get, DEFAULT_GAME_STATE, LEVEL_NAMES, normalizeRoom, normalizePlayer } from "@/lib/firebase";
 import type { CommandRatings } from "@/lib/commands";
 import { useGameStore } from "@/store/gameStore";
 import { PanicButton } from "@/components/PanicButton";
@@ -54,12 +54,7 @@ function GamePageInner() {
   }, [urlPid]);
 
   const playerId = storedPlayerId ?? urlPid ?? null;
-  const isHost = storedPlayerId ? storedIsHost : urlHost;
-
-  const roomRef = useRef<Room | null>(null);
-  roomRef.current = room;
-  const playersRef = useRef<Player[]>([]);
-  playersRef.current = players;
+  const isHost = !!playerId && (storedIsHost || urlHost || room?.host_id === playerId);
 
   useEffect(() => {
     if (!code) return;
@@ -69,6 +64,7 @@ function GamePageInner() {
       if (!snap.exists()) return;
       const data = normalizeRoom(snap.val());
       setRoom(data);
+      if (playerId && data.host_id === playerId && !storedIsHost) setIsHost(true);
       setPaused(!!data.paused);
       const gs = data.game_state;
       if (gs.subphase === "consent_gate") triggerFlash("rgba(192,57,43,0.15)");
@@ -94,7 +90,7 @@ function GamePageInner() {
       off(ref(db, `rooms/${upper}/players`));
       if (playerId) off(ref(db, `rooms/${upper}/secret_missions/${playerId}`));
     };
-  }, [code, playerId, setRoom, setPlayers, setPaused, setActiveSecretMission, triggerFlash]);
+  }, [code, playerId, storedIsHost, setRoom, setPlayers, setIsHost, setPaused, setActiveSecretMission, triggerFlash]);
 
   const handleGenerate = useCallback(async () => {
     if (!room || !isHost) return;
@@ -264,8 +260,13 @@ function GamePageInner() {
                   </div>
                   <button
                     onClick={handleGenerate}
+                    disabled={players.filter((p) => p.setup_complete).length < 2}
                     className="w-full py-4 font-bold text-sm tracking-wide transition-all active:scale-[0.98]"
-                    style={{ backgroundColor: "var(--red)", color: "#fff" }}
+                    style={{
+                      backgroundColor: "var(--red)",
+                      color: "#fff",
+                      opacity: players.filter((p) => p.setup_complete).length < 2 ? 0.45 : 1,
+                    }}
                   >
                     GENEREER OPDRACHT →
                   </button>
@@ -281,14 +282,15 @@ function GamePageInner() {
               </div>
             )}
 
-            {/* Level picker — visible to everyone */}
+            {/* Level picker */}
             <div className="w-full" style={{ backgroundColor: "var(--card)", borderRadius: 16, padding: "16px" }}>
               <p className="text-xs uppercase tracking-wider font-medium mb-3" style={{ color: "var(--text-secondary)" }}>Intensiteit</p>
               <div className="flex gap-2">
                 {([1,2,3,4,5] as const).map((n) => (
                   <button
                     key={n}
-                    onClick={() => updateSexinessLevel(code, n)}
+                    onClick={() => isHost && updateSexinessLevel(code, n)}
+                    disabled={!isHost}
                     className="flex-1 py-2 text-xs font-bold rounded-lg transition-all active:scale-95"
                     style={{
                       backgroundColor: n === gs.sexiness_level ? "var(--red)" : "rgba(255,255,255,0.06)",

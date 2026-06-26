@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { db, ref, onValue, off, Player, DEFAULT_GAME_STATE, Room } from "@/lib/firebase";
+import { db, ref, onValue, off, Player, Room } from "@/lib/firebase";
 import { useGameStore } from "@/store/gameStore";
 import { PanicButton } from "@/components/PanicButton";
 import { updateSexinessLevel, startSetupPhase } from "@/lib/gameActions";
@@ -13,15 +13,14 @@ const LEVEL_LABELS: Record<number, string> = { 1: "ZACHT", 2: "WARM", 3: "PITTIG
 export default function LobbyPage() {
   const { code } = useParams<{ code: string }>();
   const router = useRouter();
-  const { playerId, isHost, room, players, setRoom, setPlayers, setPaused } = useGameStore();
+  const { playerId, isHost: storedIsHost, room, players, setRoom, setPlayers, setIsHost, setPaused } = useGameStore();
   const [localLevel, setLocalLevel] = useState(2);
   const [copied, setCopied] = useState(false);
 
-  const gs = room ? { ...DEFAULT_GAME_STATE, ...room.game_state } : DEFAULT_GAME_STATE;
-
-  useEffect(() => {
-    if (room?.game_state?.sexiness_level) setLocalLevel(room.game_state.sexiness_level);
-  }, [room?.game_state?.sexiness_level]);
+  const isHost = useMemo(
+    () => !!playerId && (storedIsHost || room?.host_id === playerId),
+    [playerId, storedIsHost, room?.host_id]
+  );
 
   useEffect(() => {
     if (!code) return;
@@ -30,16 +29,21 @@ export default function LobbyPage() {
     onValue(rRef, (snap) => {
       if (!snap.exists()) return;
       const data = snap.val() as Room;
+      const currentDeviceIsHost = !!playerId && data.host_id === playerId;
       setRoom(data);
+      if (data.game_state?.sexiness_level) setLocalLevel(data.game_state.sexiness_level);
+      if (currentDeviceIsHost && !storedIsHost) setIsHost(true);
       setPaused(!!data.paused);
-      if (data.game_state?.phase === "setup") router.push(`/setup/${upper}`);
+      if (data.game_state?.phase === "setup") {
+        router.push(currentDeviceIsHost || storedIsHost ? `/game/${upper}` : `/setup/${upper}`);
+      }
     });
     const pRef = ref(db, `rooms/${upper}/players`);
     onValue(pRef, (snap) => {
       setPlayers(snap.exists() ? Object.values(snap.val() as Record<string, Player>) : []);
     });
     return () => { off(rRef); off(pRef); };
-  }, [code, setRoom, setPlayers, setPaused, router]);
+  }, [code, playerId, storedIsHost, setRoom, setPlayers, setIsHost, setPaused, router]);
 
   async function handleLevelChange(level: number) {
     setLocalLevel(level);

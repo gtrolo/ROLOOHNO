@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { createJSONStorage, persist } from "zustand/middleware";
 import { Player, Room, SecretMission } from "@/lib/firebase";
 
 type GameStore = {
@@ -24,27 +25,9 @@ type GameStore = {
   reset: () => void;
 };
 
-export const useGameStore = create<GameStore>((set) => ({
-  playerId: null,
-  playerName: null,
-  isHost: false,
-  room: null,
-  players: [],
-  isPaused: false,
-  activeSecretMission: null,
-  showFlash: null,
-  setPlayer: (id, name) => set({ playerId: id, playerName: name }),
-  setRoom: (room) => set({ room }),
-  setPlayers: (players) => set({ players }),
-  setIsHost: (v) => set({ isHost: v }),
-  setPaused: (v) => set({ isPaused: v }),
-  setActiveSecretMission: (m) => set({ activeSecretMission: m }),
-  triggerFlash: (color) => {
-    set({ showFlash: color });
-    setTimeout(() => set({ showFlash: null }), 300);
-  },
-  reset: () =>
-    set({
+export const useGameStore = create<GameStore>()(
+  persist(
+    (set) => ({
       playerId: null,
       playerName: null,
       isHost: false,
@@ -53,5 +36,36 @@ export const useGameStore = create<GameStore>((set) => ({
       isPaused: false,
       activeSecretMission: null,
       showFlash: null,
+      setPlayer: (id, name) => set({ playerId: id, playerName: name }),
+      setRoom: (room) => set({ room }),
+      setPlayers: (players) => set({ players }),
+      setIsHost: (v) => set({ isHost: v }),
+      setPaused: (v) => set({ isPaused: v }),
+      setActiveSecretMission: (m) => set({ activeSecretMission: m }),
+      triggerFlash: (color) => {
+        set({ showFlash: color });
+        setTimeout(() => set({ showFlash: null }), 300);
+      },
+      reset: () =>
+        set({
+          playerId: null,
+          playerName: null,
+          isHost: false,
+          room: null,
+          players: [],
+          isPaused: false,
+          activeSecretMission: null,
+          showFlash: null,
+        }),
     }),
-}));
+    {
+      name: "roloohno-game-store",
+      storage: createJSONStorage(() => localStorage),
+      partialize: (state) => ({
+        playerId: state.playerId,
+        playerName: state.playerName,
+        isHost: state.isHost,
+      }),
+    }
+  )
+);
