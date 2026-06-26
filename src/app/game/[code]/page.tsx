@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useCallback, Suspense } from "react";
+import { useEffect, useCallback, Suspense, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { db, ref, onValue, off, get, DEFAULT_GAME_STATE, LEVEL_NAMES, normalizeRoom, normalizePlayer } from "@/lib/firebase";
@@ -40,6 +40,8 @@ function GamePageInner() {
     setRoom, setPlayers, setPaused, setPlayer, setIsHost,
     activeSecretMission, setActiveSecretMission, triggerFlash, showFlash,
   } = useGameStore();
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState<string | null>(null);
 
   // Allow iframes to init identity from URL params (demo split view)
   const urlPid = searchParams.get("pid");
@@ -93,60 +95,83 @@ function GamePageInner() {
   }, [code, playerId, storedIsHost, setRoom, setPlayers, setIsHost, setPaused, setActiveSecretMission, triggerFlash]);
 
   const handleGenerate = useCallback(async () => {
-    if (!room || !isHost) return;
-    const gsRaw = { ...DEFAULT_GAME_STATE, ...room.game_state };
-    const gs = {
-      ...gsRaw,
-      completed_command_ids: Array.isArray(gsRaw.completed_command_ids) ? gsRaw.completed_command_ids : [],
-    };
-    const ready = players.filter((p) => p.setup_complete);
-
-    let commandText: string | null = null;
-    let commandCategory = "Algemeen";
-    let commandDuration: number | null = null;
-
+    if (!room || !isHost || isGenerating) return;
+    setGenerateError(null);
+    setIsGenerating(true);
     try {
-      const res = await fetch("/api/generate-command", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ level: gs.sexiness_level, players: ready.map((p) => ({ name: p.name, tags: p.consented_tags })), usedIds: gs.completed_command_ids }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        commandText = data.command; commandCategory = data.category ?? "Algemeen"; commandDuration = data.duration_seconds ?? null;
+      const gsRaw = { ...DEFAULT_GAME_STATE, ...room.game_state };
+      const gs = {
+        ...gsRaw,
+        completed_command_ids: Array.isArray(gsRaw.completed_command_ids) ? gsRaw.completed_command_ids : [],
+      };
+      const ready = players.filter((p) => p.setup_complete);
+      if (ready.length < 2) {
+        setGenerateError("Minimaal 2 spelers moeten klaar zijn.");
+        return;
       }
-    } catch { /* use local fallback */ }
 
-    // Load global ratings so high-rated commands are picked more often
-    let ratings: CommandRatings = {};
-    try {
-      const ratingsSnap = await get(ref(db, "command_ratings"));
-      if (ratingsSnap.exists()) ratings = ratingsSnap.val() as CommandRatings;
-    } catch { /* ratings optional */ }
+      let commandText: string | null = null;
+      let commandCategory = "Algemeen";
+      let commandDuration: number | null = null;
 
-    const match = findBestMatch(ready, gs.sexiness_level, gs.completed_command_ids, ratings);
-    if (!match) return;
-    const { playerA, playerB, command } = match;
+      try {
+        const res = await fetch("/api/generate-command", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ level: gs.sexiness_level, players: ready.map((p) => ({ name: p.name, tags: p.consented_tags })), usedIds: gs.completed_command_ids }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (typeof data.command === "string" && data.command.trim().length > 0) {
+            commandText = data.command.trim();
+            commandCategory = typeof data.category === "string" ? data.category : "Algemeen";
+            commandDuration = typeof data.duration_seconds === "number" ? data.duration_seconds : null;
+          }
+        }
+      } catch { /* use local fallback */ }
 
-    if (!commandText) {
-      commandText = command.command.replace(/{A}/g, playerA.name).replace(/{B}/g, playerB.name).replace(/{C}/g, players[2]?.name ?? "de groep");
-      commandCategory = command.category; commandDuration = command.duration_seconds;
-    } else {
-      commandText = commandText.replace(/{A}/g, playerA.name).replace(/{B}/g, playerB.name);
+      // Load global ratings so high-rated commands are picked more often
+      let ratings: CommandRatings = {};
+      try {
+        const ratingsSnap = await get(ref(db, "command_ratings"));
+        if (ratingsSnap.exists()) ratings = ratingsSnap.val() as CommandRatings;
+      } catch { /* ratings optional */ }
+
+      const match = findBestMatch(ready, gs.sexiness_level, gs.completed_command_ids, ratings);
+      if (!match) {
+        setGenerateError("Geen passende opdracht gevonden. Zet het niveau lager of laat spelers hun grenzen opslaan.");
+        return;
+      }
+      const { playerA, playerB, command } = match;
+      const thirdName = ready.find((p) => p.id !== playerA.id && p.id !== playerB.id)?.name ?? "de groep";
+
+      if (!commandText) {
+        commandText = command.command;
+        commandCategory = command.category;
+        commandDuration = command.duration_seconds;
+      }
+      commandText = commandText
+        .replace(/{A}/g, playerA.name)
+        .replace(/{B}/g, playerB.name)
+        .replace(/{C}/g, thirdName);
+
+      const isDemoMode = players.every((p) => p.id === playerId || ["Alex","Sam","Kim","Jesse","Jij"].includes(p.name));
+      (window as Window & { _pendingCommand?: { text: string; category: string; duration: number | null } })._pendingCommand = { text: commandText, category: commandCategory, duration: commandDuration };
+
+      if (isDemoMode) {
+        await startCommand(code, commandText, [playerA.id, playerB.id], [playerA.name, playerB.name], commandCategory, gs.sexiness_level, commandDuration, command.id);
+        return;
+      }
+
+      const initConsented: Record<string, boolean | null> = {};
+      [playerA.id, playerB.id].forEach((id) => { initConsented[id] = null; });
+      await openConsentGate(code, { player_a_id: playerA.id, player_b_id: playerB.id, player_a_name: playerA.name, player_b_name: playerB.name, category: commandCategory, level: gs.sexiness_level, consented: initConsented });
+    } catch {
+      setGenerateError("Opdracht genereren lukte niet. Probeer opnieuw.");
+    } finally {
+      setIsGenerating(false);
     }
-
-    const isDemoMode = players.every((p) => p.id === playerId || ["Alex","Sam","Kim","Jesse","Jij"].includes(p.name));
-    (window as Window & { _pendingCommand?: { text: string; category: string; duration: number | null } })._pendingCommand = { text: commandText, category: commandCategory, duration: commandDuration };
-
-    if (isDemoMode) {
-      await startCommand(code, commandText, [playerA.id, playerB.id], [playerA.name, playerB.name], commandCategory, gs.sexiness_level, commandDuration, command.id);
-      return;
-    }
-
-    const initConsented: Record<string, boolean | null> = {};
-    [playerA.id, playerB.id].forEach((id) => { initConsented[id] = null; });
-    await openConsentGate(code, { player_a_id: playerA.id, player_b_id: playerB.id, player_a_name: playerA.name, player_b_name: playerB.name, category: commandCategory, level: gs.sexiness_level, consented: initConsented });
-  }, [room, isHost, players, code, playerId]);
+  }, [room, isHost, isGenerating, players, code, playerId]);
 
   useEffect(() => {
     if (!isHost || !room) return;
@@ -260,17 +285,22 @@ function GamePageInner() {
                   </div>
                   <button
                     onClick={handleGenerate}
-                    disabled={players.filter((p) => p.setup_complete).length < 2}
+                    disabled={isGenerating || players.filter((p) => p.setup_complete).length < 2}
                     className="w-full py-4 font-bold text-sm tracking-wide transition-all active:scale-[0.98]"
                     style={{
                       backgroundColor: "var(--red)",
                       color: "#fff",
-                      opacity: players.filter((p) => p.setup_complete).length < 2 ? 0.45 : 1,
+                      opacity: isGenerating || players.filter((p) => p.setup_complete).length < 2 ? 0.45 : 1,
                     }}
                   >
-                    GENEREER OPDRACHT →
+                    {isGenerating ? "GENEREREN..." : "GENEREER OPDRACHT →"}
                   </button>
                 </div>
+                {generateError && (
+                  <p className="text-center text-sm" style={{ color: "var(--red-light)" }}>
+                    {generateError}
+                  </p>
+                )}
               </>
             ) : (
               <div className="flex flex-col items-center gap-4">
