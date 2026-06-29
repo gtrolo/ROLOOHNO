@@ -113,6 +113,7 @@ export async function startCommand(
   const cmdId = commandId ?? Date.now().toString(36);
   await patchGameState(code, {
     subphase: "executing",
+    active_players: targetPlayerIds,
     active_command: {
       id: cmdId,
       command,

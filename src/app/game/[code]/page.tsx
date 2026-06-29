@@ -137,7 +137,7 @@ function GamePageInner() {
         if (ratingsSnap.exists()) ratings = ratingsSnap.val() as CommandRatings;
       } catch { /* ratings optional */ }
 
-      const match = findBestMatch(ready, gs.sexiness_level, gs.completed_command_ids, ratings);
+      const match = findBestMatch(ready, gs.sexiness_level, gs.completed_command_ids, ratings, gs.active_players);
       if (!match) {
         setGenerateError("Geen passende opdracht gevonden. Zet het niveau lager of laat spelers hun grenzen opslaan.");
         return;

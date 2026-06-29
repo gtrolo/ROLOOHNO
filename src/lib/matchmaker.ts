@@ -28,30 +28,29 @@ export function findBestMatch(
   players: Player[],
   sexinessLevel: number,
   usedCommandIds: string[],
-  ratings?: CommandRatings
+  ratings?: CommandRatings,
+  avoidPlayerIds: string[] = []
 ): MatchResult | null {
   if (players.length < 2) return null;
 
-  let bestPair: [Player, Player] | null = null;
-  let bestOverlap: string[] = [];
+  const avoid = new Set(avoidPlayerIds);
+  const candidates: Array<{ pair: [Player, Player]; overlap: string[]; repeatScore: number }> = [];
 
   for (let i = 0; i < players.length; i++) {
     for (let j = i + 1; j < players.length; j++) {
       const overlap = tagOverlap(players[i], players[j]);
-      if (overlap.length > bestOverlap.length) {
-        bestOverlap = overlap;
-        bestPair = [players[i], players[j]];
-      }
+      const repeatScore = Number(avoid.has(players[i].id)) + Number(avoid.has(players[j].id));
+      candidates.push({ pair: [players[i], players[j]], overlap, repeatScore });
     }
   }
 
-  // fallback: any two players even without overlap
-  if (!bestPair) {
-    bestPair = [players[0], players[1]];
-    bestOverlap = [];
-  }
+  const bestRepeatScore = Math.min(...candidates.map((candidate) => candidate.repeatScore));
+  const leastRepeated = candidates.filter((candidate) => candidate.repeatScore === bestRepeatScore);
+  const bestOverlapLength = Math.max(...leastRepeated.map((candidate) => candidate.overlap.length));
+  const bestCandidates = leastRepeated.filter((candidate) => candidate.overlap.length === bestOverlapLength);
+  const selected = bestCandidates[Math.floor(Math.random() * bestCandidates.length)];
 
-  const [playerA, playerB] = bestPair;
+  const [playerA, playerB] = selected.pair;
   const allAvailableTags = [...new Set([...toArr(playerA.consented_tags), ...toArr(playerB.consented_tags)])];
 
   const command = getRandomCommand(
@@ -69,6 +68,6 @@ export function findBestMatch(
     playerB,
     category: command.category,
     command,
-    overlappingTags: bestOverlap,
+    overlappingTags: selected.overlap,
   };
 }
